@@ -1,44 +1,76 @@
-import 'package:base_flutter_framework/components/widget/image_widget/fcore_image.dart';
-import 'package:base_flutter_framework/resource/resource_icon.dart';
-import 'package:base_flutter_framework/resource/resource_image.dart';
-import 'package:base_flutter_framework/utils/constants/colors.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return Container(
-      color: AppColor.thirdBackgroundColorLight,
-      child: Stack(
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
         children: [
-          Center(
-            child: FCoreImage(
-              ResourceIcon.iconApp,
-              width: width * 0.36,
-              fit: BoxFit.fitWidth,
+          Positioned(
+            top: -250,
+            left: -151,
+            child: Container(
+              width: 446,
+              height: 410,
+              decoration: BoxDecoration(
+                color: const Color(0xFF007AF5).withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-          // Align(
-          //   alignment: Alignment.bottomCenter,
-          //   child: Padding(
-          //     padding: const EdgeInsets.all(25),
-          //     child: Text.rich(
-          //       TextSpan(
-          //         text: '${'version'.tr}: ',
-          //         style: TextAppStyle().versionTextStyle(),
-          //         children: [
-          //           TextSpan(
-          //             text: '1.0.0',
-          //             style: TextAppStyle().versionContentTextStyle(),
-          //           ),
-          //           // can add more TextSpans here...
-          //         ],
-          //       ),
-          //     ),
-          //   ),
-          // ),
+          Positioned(
+            top: -248,
+            left: 157,
+            child: Container(
+              width: 446,
+              height: 410,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF28739).withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          // Logo and text
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 318,),
+                Center(
+                  child: SizedBox(
+                    width: 99,
+                    height: 82,
+                    child: Image.asset(
+                      'assets/images/translate_logo.png',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 26),
+                const Text(
+                  'TRANSLATE ON THE GO',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 207),
+                // Loading dots
+                Center(
+                  child: SizedBox(
+                    width: 110,
+                    height: 110,
+                    child: Image.asset(
+                      'assets/images/loading.png',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
