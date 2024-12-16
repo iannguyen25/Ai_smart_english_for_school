@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "335710032298",
+    "project_id": "real-estate-app-8e6b7",
+    "storage_bucket": "real-estate-app-8e6b7.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335710032298:android:975f193ce7866264f09bd3",
+        "android_client_info": {
+          "package_name": "com.ppclink.real_estate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "335710032298-mknm2pbpvuag2rduk1c060slki3uetag.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ppclink.real_estate",
+            "certificate_hash": "157907bfd79219c2f103044cfa9e725754156e5e"
+          }
+        },
+        {
+          "client_id": "335710032298-hp2q7q9jd6rdvit2jpin4k9gc3ulg1u6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGifYSBlhjVZnBIPpgy9a3esJMge9Ig7w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "335710032298-hp2q7q9jd6rdvit2jpin4k9gc3ulg1u6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "335710032298-uvuaab8f3bnips71fonlq6ogp6ra0lgq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.real.estate.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335710032298:android:ffc4aef3b11ec5a6f09bd3",
+        "android_client_info": {
+          "package_name": "com.realestate.ppc"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "335710032298-j79pfnhanto9c2buubo5ribikoem60tg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.realestate.ppc",
+            "certificate_hash": "91b238df03a67737a3481f1462cee5bf96db986b"
+          }
+        },
+        {
+          "client_id": "335710032298-hp2q7q9jd6rdvit2jpin4k9gc3ulg1u6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGifYSBlhjVZnBIPpgy9a3esJMge9Ig7w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "335710032298-hp2q7q9jd6rdvit2jpin4k9gc3ulg1u6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "335710032298-uvuaab8f3bnips71fonlq6ogp6ra0lgq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.real.estate.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

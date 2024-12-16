@@ -1,0 +1,1 @@
+const LOGOUT_EVENT = 'logout';
