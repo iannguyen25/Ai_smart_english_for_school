@@ -187,4 +187,100 @@ class AuthService {
       return AuthResult(success: false, error: e.toString());
     }
   }
+
+  // Update user profile
+  Future<AuthResult> updateUserProfile({
+    required String userId,
+    String? firstName,
+    String? lastName,
+    String? avatar,
+  }) async {
+    try {
+      final userData = <String, dynamic>{
+        'updatedAt': Timestamp.now(),
+      };
+      
+      if (firstName != null) userData['firstName'] = firstName;
+      if (lastName != null) userData['lastName'] = lastName;
+      if (avatar != null) userData['avatar'] = avatar;
+      
+      await _firestore.collection('users').doc(userId).update(userData);
+      
+      // Get updated user data
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) {
+        return AuthResult(success: false, error: 'User not found');
+      }
+      
+      final user = app_models.User.fromMap(userDoc.data() as Map<String, dynamic>, userId);
+      return AuthResult(success: true, user: user);
+    } catch (e) {
+      print('Update profile error: $e');
+      return AuthResult(success: false, error: e.toString());
+    }
+  }
+  
+  // Change password
+  Future<AuthResult> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        return AuthResult(success: false, error: 'No user is signed in');
+      }
+      
+      // Re-authenticate user to confirm current password
+      final credential = firebase_auth.EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      
+      await user.reauthenticateWithCredential(credential);
+      
+      // Change password
+      await user.updatePassword(newPassword);
+      
+      return AuthResult(success: true);
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      print('Firebase Auth Exception during password change: ${e.code} - ${e.message}');
+      return AuthResult(success: false, error: e.message);
+    } catch (e) {
+      print('Password change error: $e');
+      return AuthResult(success: false, error: e.toString());
+    }
+  }
+  
+  // Delete user account
+  Future<AuthResult> deleteUserAccount(String password) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        return AuthResult(success: false, error: 'No user is signed in');
+      }
+      
+      // Re-authenticate user to confirm password
+      final credential = firebase_auth.EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      
+      await user.reauthenticateWithCredential(credential);
+      
+      // Delete user data from Firestore first
+      await _firestore.collection('users').doc(user.uid).delete();
+      
+      // Delete user account from Firebase Auth
+      await user.delete();
+      
+      return AuthResult(success: true);
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      print('Firebase Auth Exception during account deletion: ${e.code} - ${e.message}');
+      return AuthResult(success: false, error: e.message);
+    } catch (e) {
+      print('Account deletion error: $e');
+      return AuthResult(success: false, error: e.toString());
+    }
+  }
 } 

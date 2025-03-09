@@ -27,7 +27,7 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
     // TODO: Implement flashcard repository to load actual flashcards
     // For now, we'll use dummy data
     await Future.delayed(const Duration(seconds: 1));
-    
+
     setState(() {
       _flashcards = [
         Flashcard(
@@ -259,7 +259,8 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('Delete', style: TextStyle(color: Colors.red)),
+                title:
+                    const Text('Delete', style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(context);
                   _confirmDelete(flashcard);
@@ -304,7 +305,8 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
                         // Implement undo functionality
                         setState(() {
                           _flashcards.add(flashcard);
-                          _flashcards.sort((a, b) => a.title.compareTo(b.title));
+                          _flashcards
+                              .sort((a, b) => a.title.compareTo(b.title));
                         });
                       },
                     ),
@@ -318,4 +320,4 @@ class _FlashcardsTabState extends State<FlashcardsTab> {
       },
     );
   }
-} 
+}

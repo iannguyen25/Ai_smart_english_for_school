@@ -41,7 +41,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      // Get the student role ID (or create it if it doesn't exist)
       String roleId = 'student'; // Default fallback value
 
       try {

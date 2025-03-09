@@ -75,7 +75,7 @@ class FirebaseUserHandler {
   // Convert Firebase User to App User Model safely
   static app_models.User? convertToAppUser(User? firebaseUser, Map<String, dynamic>? userData) {
     if (firebaseUser == null) return null;
-    
+
     try {
       return app_models.User(
         id: firebaseUser.uid,
@@ -89,7 +89,7 @@ class FirebaseUserHandler {
       );
     } catch (e) {
       print('Error converting Firebase user to app user: $e');
-      
+
       // Return a basic user with minimal information
       return app_models.User(
         id: firebaseUser.uid,
@@ -100,4 +100,4 @@ class FirebaseUserHandler {
       );
     }
   }
-} 
+}

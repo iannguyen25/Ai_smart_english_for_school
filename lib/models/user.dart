@@ -2,21 +2,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'base_model.dart';
 
 class User extends BaseModel {
-  final String email;
-  final String? password; // Note: We usually don't store passwords in model objects for security
-  final String firstName;
-  final String lastName;
+  final String? email;
+  final String?
+      password; // Note: We usually don't store passwords in model objects for security
+  final String? firstName;
+  final String? lastName;
   final String? avatar;
-  final String roleId;
+  final String? roleId;
 
   User({
     String? id,
-    required this.email,
+    this.email,
     this.password,
-    required this.firstName,
-    required this.lastName,
+    this.firstName,
+    this.lastName,
     this.avatar,
-    required this.roleId,
+    this.roleId,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) : super(
@@ -77,4 +78,4 @@ class User extends BaseModel {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-} 
+}

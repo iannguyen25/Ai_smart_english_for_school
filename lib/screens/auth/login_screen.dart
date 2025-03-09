@@ -1,3 +1,4 @@
+import 'package:base_flutter_framework/screens/auth/forgot_password_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../services/auth_service.dart';
@@ -139,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        // Handle forgot password
+                        Get.to(() => ForgotPasswordScreen());
                       },
                       child: const Text('Forgot Password?'),
                     ),
@@ -175,4 +176,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-} 
+}

@@ -1,5 +1,8 @@
+import 'package:base_flutter_framework/screens/profile/delete_account_screen.dart';
+import 'package:base_flutter_framework/screens/profile/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../models/user.dart';
 import '../../../services/auth_service.dart';
 import '../../auth/login_screen.dart';
 
@@ -34,7 +37,7 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     final user = _authService.currentUser;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
@@ -55,39 +58,40 @@ class _ProfileTabState extends State<ProfileTab> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 20),
-                  
+
                   // Profile picture
                   CircleAvatar(
                     radius: 60,
                     backgroundColor: Theme.of(context).primaryColor,
                     child: user?.avatar != null
                         ? null // In a real app, load the image here
-                        : const Icon(Icons.person, size: 60, color: Colors.white),
+                        : const Icon(Icons.person,
+                            size: 60, color: Colors.white),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // User name
                   Text(
                     user?.fullName ?? 'User',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 4),
-                  
+
                   // User email
                   Text(
                     user?.email ?? 'email@example.com',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Stats section
                   _buildStatsSection(),
                   const SizedBox(height: 32),
-                  
+
                   // Options section
                   _buildOptionsSection(),
                   const SizedBox(height: 32),
-                  
+
                   // Sign out button
                   ElevatedButton.icon(
                     onPressed: _isLoading ? null : _signOut,
@@ -167,6 +171,7 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildOptionsSection() {
+    final user = _authService.currentUser;
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -178,7 +183,7 @@ class _ProfileTabState extends State<ProfileTab> {
             'Edit Profile',
             Icons.edit,
             () {
-              // Navigate to edit profile
+              Get.to(() => EditProfileScreen(user: user ?? User()));
             },
           ),
           const Divider(height: 1),
@@ -213,6 +218,13 @@ class _ProfileTabState extends State<ProfileTab> {
               // Navigate to help
             },
           ),
+          _buildOptionTile(
+            'Delete Account',
+            Icons.delete,
+            () {
+              Get.to(() => DeleteAccountScreen());
+            },
+          ),
         ],
       ),
     );
@@ -226,4 +238,4 @@ class _ProfileTabState extends State<ProfileTab> {
       onTap: onTap,
     );
   }
-} 
+}
