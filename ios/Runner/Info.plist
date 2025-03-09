@@ -11,7 +11,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Timnha24h</string>
+	<string>LA_English</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -48,7 +48,7 @@
 	<key>FacebookAppID</key>
 	<string>949569105890608</string>
 	<key>FacebookDisplayName</key>
-	<string>Timnha24h</string>
+	<string>LA_English</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<string>NO</string>
 	<key>FirebaseDynamicLinksCustomDomains</key>

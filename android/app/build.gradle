@@ -57,7 +57,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "com.ppclink.real_estate"
+        applicationId "com.aiSmartEnglish.vn"
         minSdkVersion 25
         targetSdkVersion 34
         multiDexEnabled true

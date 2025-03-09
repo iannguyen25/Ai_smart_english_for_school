@@ -29,13 +29,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  flutter_localizations:
-    sdk: flutter
 
   json_annotation: ^4.8.1
   flutter_bloc: ^8.1.3
-  html_unescape: ^2.0.0
   flutter_linkify: ^6.0.0
   equatable: ^2.0.5
   intl: ^0.19.0
@@ -47,10 +43,7 @@ dependencies:
   flutter_easyloading: ^3.0.5
   flutter_svg: ^2.0.9
   connectivity: ^3.0.6
-  rxdart: ^0.27.7
   flutter_launcher_icons: ^0.13.1
-  extended_image: ^8.1.1
-  carousel_slider: ^4.2.1
   dots_indicator: ^3.0.0
   share: ^2.0.4
   # uni_links: ^0.5.1
@@ -59,18 +52,29 @@ dependencies:
   path_provider: ^2.1.1
   # image_downloader: ^0.31.0
 
+  # Firebase
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  cloud_firestore: ^4.13.6
+  firebase_storage: ^11.5.6
+  cloud_functions: ^4.5.8
+  firebase_crashlytics: ^3.4.8
+  firebase_analytics: ^10.7.4
+
   # Local data
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+
+  extended_image:
+  rxdart:
 
   # Form
   modal_bottom_sheet: ^3.0.0-pre
   flutter_datetime_picker: ^1.5.1
   date_picker_timeline: ^1.2.5
- 
-  custom_pop_up_menu: ^1.2.4
+
   images_picker: ^1.2.11
-  
+
   flutter_rating_bar: ^4.0.1
   image_picker: ^1.0.4
   # introduction_screen: ^3.1.12
@@ -78,9 +82,7 @@ dependencies:
 
   # Service libraries
   dio: ^5.4.0
-  firebase_crashlytics: ^3.4.8
   http: ^1.1.2
-  giphy_picker: ^3.0.1
   socket_io_client: ^2.0.3
   http_parser: ^4.0.2
   package_info: ^2.0.2
@@ -88,7 +90,7 @@ dependencies:
   mqtt_client: ^10.0.0
 
 
-  
+
 
 
 
@@ -112,8 +114,8 @@ flutter:
     - assets/fonts/
     - assets/images/
     - assets/lang/
-    
-  
+
+
 
 
 
@@ -133,9 +135,9 @@ flutter:
     - family: mulish
       fonts:
         - asset: assets/fonts/Mulish-Regular.ttf
-     
-  #       
+
+  #
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
-  
+
