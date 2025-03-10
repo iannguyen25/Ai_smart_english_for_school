@@ -6,20 +6,98 @@ import '../../../models/user.dart';
 import '../../../services/auth_service.dart';
 import '../../auth/login_screen.dart';
 
-class ProfileTab extends StatefulWidget {
-  @override
-  _ProfileTabState createState() => _ProfileTabState();
-}
-
-class _ProfileTabState extends State<ProfileTab> {
+class ProfileTab extends StatelessWidget {
   final AuthService _authService = AuthService();
-  bool _isLoading = false;
 
-  Future<void> _signOut() async {
-    setState(() {
-      _isLoading = true;
-    });
+  ProfileTab({Key? key}) : super(key: key);
 
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: _authService.currentUserStream,
+      builder: (context, snapshot) {
+        final user = snapshot.data ?? _authService.currentUser;
+
+        if (user == null) {
+          return const Center(
+            child: Text('Vui lòng đăng nhập lại'),
+          );
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Profile'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () {
+                  // Navigate to settings
+                },
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
+
+                // Profile picture
+                CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Theme.of(context).primaryColor,
+                  child: user.avatar != null
+                      ? null // In a real app, load the image here
+                      : const Icon(Icons.person, size: 60, color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+
+                // User name
+                Text(
+                  user.fullName ?? 'User',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 4),
+
+                // User email
+                Text(
+                  user.email ?? 'email@example.com',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 32),
+
+                // Stats section
+                _buildStatsSection(context),
+                const SizedBox(height: 32),
+
+                // Options section
+                _buildOptionsSection(),
+                const SizedBox(height: 32),
+
+                // Sign out button
+                ElevatedButton.icon(
+                  onPressed: () => _signOut(context),
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Sign Out'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _signOut(BuildContext context) async {
     try {
       await _authService.signOut();
       Get.offAll(() => LoginScreen());
@@ -27,92 +105,10 @@ class _ProfileTabState extends State<ProfileTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error signing out: ${e.toString()}')),
       );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = _authService.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              // Navigate to settings
-            },
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 20),
-
-                  // Profile picture
-                  CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Theme.of(context).primaryColor,
-                    child: user?.avatar != null
-                        ? null // In a real app, load the image here
-                        : const Icon(Icons.person,
-                            size: 60, color: Colors.white),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // User name
-                  Text(
-                    user?.fullName ?? 'User',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 4),
-
-                  // User email
-                  Text(
-                    user?.email ?? 'email@example.com',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Stats section
-                  _buildStatsSection(),
-                  const SizedBox(height: 32),
-
-                  // Options section
-                  _buildOptionsSection(),
-                  const SizedBox(height: 32),
-
-                  // Sign out button
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _signOut,
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Sign Out'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildStatsSection() {
+  Widget _buildStatsSection(BuildContext context) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -131,9 +127,9 @@ class _ProfileTabState extends State<ProfileTab> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatItem('Flashcards', '42'),
-                _buildStatItem('Quizzes', '15'),
-                _buildStatItem('Streak', '7 days'),
+                _buildStatItem('Flashcards', '42', context),
+                _buildStatItem('Quizzes', '15', context),
+                _buildStatItem('Streak', '7 days', context),
               ],
             ),
             const SizedBox(height: 16),
@@ -154,7 +150,7 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
+  Widget _buildStatItem(String label, String value, BuildContext context) {
     return Column(
       children: [
         Text(

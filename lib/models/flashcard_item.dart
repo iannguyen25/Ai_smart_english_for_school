@@ -1,25 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'base_model.dart';
 
-class FlashcardItem extends BaseModel {
+class FlashcardItem {
+  final String? id;
   final String flashcardId;
   final String question;
   final String answer;
   final String? image;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   FlashcardItem({
-    String? id,
+    this.id,
     required this.flashcardId,
     required this.question,
     required this.answer,
     this.image,
-    Timestamp? createdAt,
-    Timestamp? updatedAt,
-  }) : super(
-          id: id,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-        );
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) :
+    this.createdAt = createdAt ?? DateTime.now(),
+    this.updatedAt = updatedAt ?? DateTime.now();
 
   factory FlashcardItem.fromMap(Map<String, dynamic> map, String id) {
     return FlashcardItem(
@@ -28,35 +28,32 @@ class FlashcardItem extends BaseModel {
       question: map['question'] ?? '',
       answer: map['answer'] ?? '',
       image: map['image'],
-      createdAt: map['createdAt'],
-      updatedAt: map['updatedAt'],
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
     );
   }
 
-  @override
   Map<String, dynamic> toMap() {
     return {
       'flashcardId': flashcardId,
       'question': question,
       'answer': answer,
       'image': image,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
     };
   }
 
-  @override
   FlashcardItem copyWith({
-    String? id,
     String? flashcardId,
     String? question,
     String? answer,
     String? image,
-    Timestamp? createdAt,
-    Timestamp? updatedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return FlashcardItem(
-      id: id ?? this.id,
+      id: this.id,
       flashcardId: flashcardId ?? this.flashcardId,
       question: question ?? this.question,
       answer: answer ?? this.answer,
