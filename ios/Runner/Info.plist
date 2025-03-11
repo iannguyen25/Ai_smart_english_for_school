@@ -82,7 +82,7 @@
 	<key>NSCalendarsUsageDescription</key>
 	<string>This app requires calendars access to function properly.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>App requires access to the camera.</string>
+	<string>Ứng dụng cần quyền truy cập camera để chụp ảnh bìa cho lớp học</string>
 	<key>NSContactsUsageDescription</key>
 	<string>This app requires contacts access to function properly.</string>
 	<key>NSLocalNetworkUsageDescription</key>
@@ -102,7 +102,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app requires mic access to photo</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app requires photo library access to function properly.</string>
+	<string>Ứng dụng cần quyền truy cập thư viện ảnh để chọn ảnh bìa cho lớp học</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>This app requires reminders access to function properly.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

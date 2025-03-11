@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /classrooms/{classroomId} {
+      // Cho phép read với các điều kiện cụ thể
+      allow read: if request.auth != null && (
+        // Cho phép query bằng inviteCode
+        request.query.limit <= 1 ||
+        // Hoặc truy cập trực tiếp document
+        resource.id == classroomId
+      );
+      
+      // Cho phép tạo lớp học
+      allow create: if isAuthenticated();
+      
+      // Cho phép cập nhật với điều kiện đơn giản
+      allow update: if isAuthenticated() && (
+        // Là giáo viên
+        request.auth.uid == resource.data.teacherId ||
+        // HOẶC đang cập nhật pendingMemberIds
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingMemberIds'])
+      );
+      
+      // Chỉ giáo viên mới được xóa lớp
+      allow delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.teacherId;
+    }
+
+    // Rules cho collection users
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Rules cho collection roles
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // Rules cho collection flashcards
+    match /flashcards/{flashcardId} {
+      allow read: if isAuthenticated() && (
+        resource.data.isPublic == true || 
+        request.auth.uid == resource.data.userId
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+    }
+
+    // Rules cho collection flashcard_items
+    match /flashcard_items/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+  }
+}

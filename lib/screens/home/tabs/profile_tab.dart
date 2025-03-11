@@ -2,7 +2,7 @@ import 'package:base_flutter_framework/screens/profile/delete_account_screen.dar
 import 'package:base_flutter_framework/screens/profile/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../models/user.dart';
+import '../../../models/app_user.dart';
 import '../../../services/auth_service.dart';
 import '../../auth/login_screen.dart';
 
@@ -49,7 +49,8 @@ class ProfileTab extends StatelessWidget {
                   backgroundColor: Theme.of(context).primaryColor,
                   child: user.avatar != null
                       ? null // In a real app, load the image here
-                      : const Icon(Icons.person, size: 60, color: Colors.white),
+                      : const Icon(Icons.person,
+                          size: 60, color: Colors.white),
                 ),
                 const SizedBox(height: 16),
 

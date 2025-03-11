@@ -1,5 +1,5 @@
+import 'package:base_flutter_framework/models/app_user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/user.dart';
 import 'base_repository.dart';
 
 class UserRepository extends BaseRepository<User> {
@@ -15,7 +15,7 @@ class UserRepository extends BaseRepository<User> {
   Future<User?> getById(String id) async {
     final doc = await collection.doc(id).get();
     if (!doc.exists) return null;
-    
+
     return User.fromMap(doc.data() as Map<String, dynamic>, doc.id);
   }
 
@@ -28,7 +28,8 @@ class UserRepository extends BaseRepository<User> {
   }
 
   @override
-  Future<List<User>> query(Query Function(CollectionReference) queryBuilder) async {
+  Future<List<User>> query(
+      Query Function(CollectionReference) queryBuilder) async {
     final querySnapshot = await queryBuilder(collection).get();
     return querySnapshot.docs.map((doc) {
       return User.fromMap(doc.data() as Map<String, dynamic>, doc.id);
@@ -47,10 +48,11 @@ class UserRepository extends BaseRepository<User> {
 
   // Additional methods specific to User
   Future<User?> getUserByEmail(String email) async {
-    final querySnapshot = await collection.where('email', isEqualTo: email).limit(1).get();
+    final querySnapshot =
+        await collection.where('email', isEqualTo: email).limit(1).get();
     if (querySnapshot.docs.isEmpty) return null;
-    
+
     final doc = querySnapshot.docs.first;
     return User.fromMap(doc.data() as Map<String, dynamic>, doc.id);
   }
-} 
+}

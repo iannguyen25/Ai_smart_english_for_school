@@ -1,7 +1,7 @@
-import 'package:base_flutter_framework/models/user.dart';
+import 'package:base_flutter_framework/models/app_user.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/user.dart' as app_models;
+import '../models/app_user.dart' as app_models;
 import '../repositories/user_repository.dart';
 import '../utils/firebase_user_handler.dart';
 import 'dart:async';
@@ -37,15 +37,13 @@ class AuthService {
 
     if (firebaseUser != null) {
       try {
-        final doc =
-            await _firestore.collection('users').doc(firebaseUser.uid).get();
+        final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
         print('Init Current User - User Document: ${doc.data()}'); // Debug log
 
         if (doc.exists) {
           _currentUser = User.fromMap(doc.data()!, doc.id);
           _currentUserController.add(_currentUser); // Thông báo thay đổi
-          print(
-              'Init Current User - Current User set to: $_currentUser'); // Debug log
+          print('Init Current User - Current User set to: $_currentUser'); // Debug log
         }
       } catch (e) {
         print('Error initializing current user: $e');
@@ -66,13 +64,11 @@ class AuthService {
 
       if (firebaseUser != null) {
         try {
-          final doc =
-              await _firestore.collection('users').doc(firebaseUser.uid).get();
+          final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
           if (doc.exists) {
             _currentUser = User.fromMap(doc.data()!, doc.id);
             _currentUserController.add(_currentUser);
-            print(
-                'Auth State Changed - Current User set to: $_currentUser'); // Debug log
+            print('Auth State Changed - Current User set to: $_currentUser'); // Debug log
           }
         } catch (e) {
           print('Error updating current user: $e');

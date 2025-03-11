@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../services/auth_service.dart';
-import '../../models/user.dart' as app_models;
+import '../../models/app_user.dart' as app_models;
 
 class EditProfileScreen extends StatefulWidget {
   final app_models.User user;

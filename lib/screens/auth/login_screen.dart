@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import '../../services/auth_service.dart';
 import 'register_screen.dart';
 import '../home/home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import '../../models/app_user.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
