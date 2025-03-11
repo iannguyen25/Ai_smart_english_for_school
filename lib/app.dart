@@ -1,3 +1,5 @@
+import 'package:base_flutter_framework/module/home/view/home_screen.dart';
+import 'package:base_flutter_framework/screens/auth/login_screen.dart';
 import 'package:base_flutter_framework/utils/constants/common.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -9,10 +11,16 @@ import 'theme/theme_data.dart';
 import 'translations/app_translations_delegate.dart';
 import 'translations/application.dart';
 import 'utils/constants/colors.dart';
+import 'services/auth_service.dart';
 
-class App extends StatelessWidget {
-  AppTranslationsDelegate? _newLocaleDelegate =
-      AppTranslationsDelegate(newLocale: new Locale('en', ''));
+class MyApp extends StatelessWidget {
+  final AuthService authService;
+
+  const MyApp({
+    Key? key,
+    required this.authService,
+  }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
@@ -28,7 +36,7 @@ class App extends StatelessWidget {
       themeMode: ThemeMode.light,
       supportedLocales: application.supportedLocales(),
       localizationsDelegates: [
-        _newLocaleDelegate!,
+        AppTranslationsDelegate(newLocale: new Locale('en', '')),
         DefaultMaterialLocalizations.delegate,
         DefaultCupertinoLocalizations.delegate,
         DefaultWidgetsLocalizations.delegate,
@@ -36,6 +44,9 @@ class App extends StatelessWidget {
       builder: EasyLoading.init(builder: (context, widget) {
         return widget!;
       }),
+      home: authService.currentUser != null
+          ? const HomeScreen()
+          : LoginScreen(),
     );
   }
 }

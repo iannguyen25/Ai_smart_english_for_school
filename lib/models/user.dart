@@ -9,6 +9,8 @@ class User extends BaseModel {
   final String? lastName;
   final String? avatar;
   final String? roleId;
+  final Timestamp? createdAt;
+  final Timestamp? updatedAt;
 
   User({
     String? id,
@@ -18,8 +20,8 @@ class User extends BaseModel {
     this.lastName,
     this.avatar,
     this.roleId,
-    Timestamp? createdAt,
-    Timestamp? updatedAt,
+     this.createdAt,
+     this.updatedAt,
   }) : super(
           id: id,
           createdAt: createdAt,
@@ -34,8 +36,8 @@ class User extends BaseModel {
       lastName: map['lastName'] ?? '',
       avatar: map['avatar'],
       roleId: map['roleId'] ?? '',
-      createdAt: map['createdAt'],
-      updatedAt: map['updatedAt'],
+      createdAt: map['createdAt'] as Timestamp,
+      updatedAt: map['updatedAt'] as Timestamp,
     );
   }
 
@@ -47,8 +49,8 @@ class User extends BaseModel {
       'lastName': lastName,
       'avatar': avatar,
       'roleId': roleId,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
+      'createdAt': Timestamp.fromDate(createdAt?.toDate() ?? DateTime.now()),
+      'updatedAt': Timestamp.fromDate(updatedAt?.toDate() ?? DateTime.now()),
     };
   }
 

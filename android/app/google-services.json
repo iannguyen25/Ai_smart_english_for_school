@@ -12,7 +12,12 @@
           "package_name": "com.aiSmartEnglish.vn"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "385592852853-6tfem5eldrg53616pg0bltif9ia5tlv7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCTdWXFP3jgU-w2GgFslrWpFxiJclZ7h0k"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "385592852853-6tfem5eldrg53616pg0bltif9ia5tlv7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "385592852853-thik1s0cti7nku8sd2hkit6hngi7q6ng.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ppclink.ios.timnha24h"
+              }
+            }
+          ]
         }
       }
     }

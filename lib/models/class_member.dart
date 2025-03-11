@@ -15,7 +15,7 @@ class ClassMember extends BaseModel {
     required this.status,
     Timestamp? createdAt,
     Timestamp? updatedAt,
-  }) : 
+  }) :
     this.joinedAt = joinedAt ?? Timestamp.now(),
     super(
       id: id,
@@ -67,4 +67,4 @@ class ClassMember extends BaseModel {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-} 
+}
