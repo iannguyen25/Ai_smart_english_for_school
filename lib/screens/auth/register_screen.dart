@@ -6,6 +6,7 @@ import 'login_screen.dart';
 import '../home/home_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../../models/app_user.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -98,8 +99,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Up'),
+        backgroundColor: const Color.fromARGB(255, 166, 234, 255),
+        title: Text(
+          'Đăng ký',
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
       ),
+      backgroundColor: const Color.fromARGB(255, 166, 234, 255),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -110,13 +120,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
                   Text(
-                    'Create Account',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    'Tạo tài khoản',
+                    style: Theme.of(context).textTheme.headlineLarge,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 56),
                   if (_errorMessage != null)
                     Container(
                       padding: const EdgeInsets.all(10),
@@ -135,13 +144,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _firstNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'First Name',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            labelText: 'Họ',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  BorderSide(color: Colors.blue, width: 2),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  BorderSide(color: Colors.grey, width: 1),
+                            ),
+                            prefixIcon: Icon(Icons.person),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your first name';
+                              return 'Hãy nhập họ';
                             }
                             return null;
                           },
@@ -151,13 +176,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _lastNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Last Name',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            labelText: 'Tên',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  BorderSide(color: Colors.blue, width: 2),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  BorderSide(color: Colors.grey, width: 1),
+                            ),
+                            prefixIcon: Icon(Icons.person),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your last name';
+                              return 'Hãy nhập tên';
                             }
                             return null;
                           },
@@ -169,17 +210,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
                       labelText: 'Email',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.blue, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey, width: 1),
+                      ),
                       prefixIcon: Icon(Icons.email),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return 'Hãy nhập email';
                       }
                       if (!GetUtils.isEmail(value)) {
-                        return 'Please enter a valid email address';
+                        return 'Hãy nhập địa chỉ email hợp lệ';
                       }
                       return null;
                     },
@@ -188,17 +242,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      labelText: 'Mật khẩu',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.blue, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey, width: 1),
+                      ),
                       prefixIcon: Icon(Icons.lock),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a password';
+                        return 'Hãy nhập mật khẩu';
                       }
                       if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return 'Mật khẩu phải có ít nhất 6 ký tự';
                       }
                       return null;
                     },
@@ -207,17 +274,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm Password',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      labelText: 'Xác nhận mật khẩu',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.blue, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey, width: 1),
+                      ),
                       prefixIcon: Icon(Icons.lock),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
+                        return 'Hãy xác nhận mật khẩu';
                       }
                       if (value != _passwordController.text) {
-                        return 'Passwords do not match';
+                        return 'Mật khẩu không khớp';
                       }
                       return null;
                     },
@@ -226,22 +306,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ElevatedButton(
                     onPressed: _isLoading ? null : _register,
                     style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: _isLoading
                         ? const CircularProgressIndicator()
-                        : const Text('Sign Up'),
+                        : Text(
+                            'Đăng ký',
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
                   ),
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Already have an account?'),
+                      const Text('Đã có tài khoản?'),
                       TextButton(
                         onPressed: () {
                           Get.back();
                         },
-                        child: const Text('Sign In'),
+                        child: const Text('Đăng nhập'),
                       ),
                     ],
                   ),

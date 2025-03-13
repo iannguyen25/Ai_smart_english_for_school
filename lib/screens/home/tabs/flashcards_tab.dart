@@ -1,4 +1,3 @@
-import 'package:base_flutter_framework/models/flashcard_item.dart';
 import 'package:base_flutter_framework/screens/flashcards/create_edit_flashcard_screen.dart';
 import 'package:base_flutter_framework/screens/flashcards/flashcard_detail_screen.dart';
 import 'package:base_flutter_framework/screens/flashcards/search_flashcards_screen.dart';

@@ -38,9 +38,7 @@ class _JoinByCodeScreenState extends State<JoinByCodeScreen> {
       await _classroomService.joinClassroomByCode(code, currentUser?.id ?? "");
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tham gia lớp học thành công')),
-      );
+
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;

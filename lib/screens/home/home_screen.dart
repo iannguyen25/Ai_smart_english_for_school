@@ -1,11 +1,13 @@
+import 'package:base_flutter_framework/screens/classroom/classroom_list_screen.dart';
+import 'package:base_flutter_framework/screens/classroom/create_edit_classroom_screen.dart';
+import 'package:base_flutter_framework/screens/folder/create_edit_folder_screen.dart';
 import 'package:base_flutter_framework/screens/home/tabs/ai_chat_tab.dart';
 import 'package:base_flutter_framework/screens/home/tabs/classrooms_tab.dart';
+import 'package:base_flutter_framework/screens/home/tabs/folders_tab.dart';
 import 'package:flutter/material.dart';
 import 'tabs/dashboard_tab.dart';
-import 'tabs/folder_tab.dart';
 import 'tabs/profile_tab.dart';
 import '../flashcards/create_edit_flashcard_screen.dart';
-import '../classroom/create_edit_classroom_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -25,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _tabs = [
     DashboardTab(),
-    const FolderTab(),
+    FoldersTab(),
     AIChatTab(),
     ProfileTab(),
   ];
@@ -70,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: const Icon(Icons.style, color: Colors.blue),
                 ),
-                title: const Text('Tạo Flashcard'),
+                title: const Text('Tạo bộ flashcard'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -90,13 +92,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: const Icon(Icons.class_, color: Colors.green),
                 ),
-                title: const Text('Lớp học'),
+                title: const Text('Tạo lớp học'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ClassroomsTab(),
+                      builder: (context) => CreateEditClassroomScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.folder, color: Colors.orange),
+                ),
+                title: const Text('Tạo thư mục'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreateEditFolderScreen(),
                     ),
                   );
                 },
@@ -112,6 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: _tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -119,18 +142,18 @@ class _HomeScreenState extends State<HomeScreen> {
         type: BottomNavigationBarType.fixed,
         items: [
           const BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+            icon: Icon(Icons.home),
+            label: 'Trang chủ',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.folder),
-            label: 'Folder',
+            label: 'Thư mục',
           ),
           BottomNavigationBarItem(
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
+                color: Colors.blue,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.add, color: Colors.white),
@@ -143,10 +166,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'Profile',
+            label: 'Cá nhân',
           ),
         ],
-        selectedItemColor: Theme.of(context).primaryColor,
+        selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
       ),
     );

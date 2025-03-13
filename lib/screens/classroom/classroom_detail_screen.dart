@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../models/classroom.dart';
 import '../../services/classroom_service.dart';
-import '../../services/auth_service.dart';
 import 'create_edit_classroom_screen.dart';
 import 'member_list_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
@@ -23,7 +22,7 @@ class ClassroomDetailScreen extends StatefulWidget {
 }
 
 class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _classroomService = ClassroomService();
   final _userService = UserService();
   final _auth = auth.FirebaseAuth.instance;
@@ -31,13 +30,13 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
   Classroom? classroom;
   User? teacher;
   bool _isLoading = true;
-  String? _errorMessage;
   bool _isMember = false;
   bool _isTeacher = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 1, vsync: this);
     _loadClassroom();
   }
 
@@ -53,27 +52,36 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
       final authUser = _auth.currentUser;
       final isTeacher = authUser != null && data.teacherId == authUser.uid;
 
-      // Tạo TabController mới
-      _tabController?.dispose();
-      _tabController = TabController(
+      // Tạo TabController mới với số lượng tab phù hợp
+      final newTabController = TabController(
         length: isTeacher ? 2 : 1,
         vsync: this,
       );
-
+      
+      // Đảm bảo widget vẫn mounted trước khi setState
+      if (!mounted) return;
+      
+      // Cập nhật state
       setState(() {
         classroom = data;
         teacher = teacherData;
         _isMember = data.memberIds.contains(authUser?.uid);
         _isTeacher = isTeacher;
+        
+        // Dispose controller cũ và gán controller mới
+        _tabController?.dispose();
+        _tabController = newTabController;
+        
         _isLoading = false;
       });
     } catch (e) {
+      // Đảm bảo widget vẫn mounted trước khi setState
+      if (!mounted) return;
+      
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     }
   }
 
@@ -84,7 +92,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
         throw 'Vui lòng đăng nhập để tham gia lớp học';
       }
 
-      await _classroomService.addMember(widget.classroomId, currentUser.uid!);
+      await _classroomService.addMember(widget.classroomId, currentUser.uid);
 
       Get.snackbar(
         'Thành công',
@@ -132,7 +140,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
       if (currentUser == null) throw 'Vui lòng đăng nhập';
 
       await _classroomService.removeMember(
-          widget.classroomId, currentUser.uid!);
+          widget.classroomId, currentUser.uid);
 
       Get.snackbar(
         'Thành công',
@@ -324,24 +332,37 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || classroom == null || _tabController == null) {
+    if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Lớp học')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    final authUser = _auth.currentUser;
-    final isTeacher = authUser != null && classroom!.teacherId == authUser.uid;
+    if (classroom == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Lớp học')),
+        body: const Center(child: Text('Không tìm thấy lớp học')),
+      );
+    }
+
+    if (_tabController == null) {
+      final isTeacher = _auth.currentUser != null && 
+                        classroom!.teacherId == _auth.currentUser!.uid;
+      _tabController = TabController(
+        length: isTeacher ? 2 : 1,
+        vsync: this,
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(classroom!.name),
+        title: Text(classroom?.name ?? 'Lớp học'),
         bottom: TabBar(
-          controller: _tabController!,
+          controller: _tabController,
           tabs: [
             const Tab(text: 'Thông tin'),
-            if (isTeacher) const Tab(text: 'Chờ duyệt'),
+            if (_isTeacher) const Tab(text: 'Chờ duyệt'),
           ],
         ),
         actions: [
@@ -352,10 +373,10 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
         ],
       ),
       body: TabBarView(
-        controller: _tabController!,
+        controller: _tabController,
         children: [
           _buildInfoTab(),
-          if (isTeacher) _buildPendingTab(),
+          if (_isTeacher) _buildPendingTab(),
         ],
       ),
       floatingActionButton: _isMember
@@ -525,7 +546,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
   Widget _buildPendingTab() {
     if (classroom == null) return const SizedBox.shrink();
 
-    final pendingMemberIds = classroom!.pendingMemberIds ?? [];
+    final pendingMemberIds = classroom!.pendingMemberIds;
 
     if (pendingMemberIds.isEmpty) {
       return Center(
@@ -589,25 +610,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
                   IconButton(
                     icon: const Icon(Icons.check_circle_outline),
                     color: Colors.green,
-                    onPressed: () async {
-                      try {
-                        await _classroomService.approveMember(
-                          widget.classroomId,
-                          userId,
-                        );
-                        _loadClassroom(); // Reload data
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Đã chấp nhận yêu cầu tham gia')),
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(e.toString())),
-                        );
-                      }
-                    },
+                    onPressed: () => _approveMember(userId),
                   ),
                   // Nút từ chối
                   IconButton(
@@ -640,6 +643,31 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
         );
       },
     );
+  }
+
+  Future<void> _approveMember(String userId) async {
+    try {
+      await _classroomService.approveMember(
+        widget.classroomId,
+        userId,
+      );
+      
+      // Đánh dấu đang loading trước khi reload
+      setState(() => _isLoading = true);
+      
+      // Reload classroom data
+      await _loadClassroom();
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã chấp nhận yêu cầu tham gia')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
   }
 
   @override

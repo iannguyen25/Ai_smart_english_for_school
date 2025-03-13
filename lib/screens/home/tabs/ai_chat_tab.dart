@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/ai_service.dart';
+// import '../../../services/auth_service.dart';
+// import '../../../services/ai_service.dart';
 
 class ChatMessage {
   final String text;
@@ -21,8 +20,8 @@ class AIChatTab extends StatefulWidget {
 }
 
 class _AIChatTabState extends State<AIChatTab> {
-  final AuthService _authService = AuthService();
-  final AIService _aiService = AIService();
+  // final AuthService _authService = AuthService();
+  // final AIService _aiService = AIService();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
@@ -56,26 +55,26 @@ class _AIChatTabState extends State<AIChatTab> {
     if (text.trim().isEmpty) return;
 
     _textController.clear();
-    
+
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true));
       _isLoading = true;
     });
-    
+
     _scrollToBottom();
 
     try {
       // In a real app, this would call the AI service
       // For now, we'll simulate a response
-      final userId = _authService.currentUser?.id ?? 'anonymous';
-      
+      // final userId = _authService.currentUser?.id ?? 'anonymous';
+
       // Uncomment this in a real implementation
       // final interaction = await _aiService.generateResponse(
       //   userId: userId,
       //   prompt: text,
       // );
       // final response = interaction.response;
-      
+
       // Simulated response for demo
       await Future.delayed(const Duration(seconds: 1));
       final response = _getSimulatedResponse(text);
@@ -84,7 +83,7 @@ class _AIChatTabState extends State<AIChatTab> {
         _messages.add(ChatMessage(text: response, isUser: false));
         _isLoading = false;
       });
-      
+
       _scrollToBottom();
     } catch (e) {
       setState(() {
@@ -94,16 +93,16 @@ class _AIChatTabState extends State<AIChatTab> {
         ));
         _isLoading = false;
       });
-      
+
       _scrollToBottom();
     }
   }
 
   String _getSimulatedResponse(String text) {
     final lowercaseText = text.toLowerCase();
-    
-    if (lowercaseText.contains('hello') || 
-        lowercaseText.contains('hi') || 
+
+    if (lowercaseText.contains('hello') ||
+        lowercaseText.contains('hi') ||
         lowercaseText.contains('hey')) {
       return 'Hello! How are you doing today? Would you like to practice conversation, vocabulary, or grammar?';
     } else if (lowercaseText.contains('vocabulary')) {
@@ -277,4 +276,4 @@ class _AIChatTabState extends State<AIChatTab> {
       ),
     );
   }
-} 
+}

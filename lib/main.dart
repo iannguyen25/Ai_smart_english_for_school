@@ -7,11 +7,12 @@ import 'screens/auth/login_screen.dart';
 import 'services/auth_service.dart';
 import 'screens/home/home_screen.dart';
 import 'services/firebase_initializer.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 // Global error handler for catching Firebase type errors
 void _handleError(Object error, StackTrace stack) {
   print('Global error handler caught: $error');
-  
+
   // Check for PigeonUserDetail error specifically
   if (error.toString().contains('PigeonUserDetail')) {
     print('Detected PigeonUserDetail type casting error');
@@ -30,7 +31,7 @@ Future<void> main() async {
     FlutterError.presentError(details);
     _handleError(details.exception, details.stack ?? StackTrace.current);
   };
-  
+
   // Handle zone errors
   runZonedGuarded(() async {
     // Ensure Flutter is initialized
@@ -41,16 +42,17 @@ Future<void> main() async {
     try {
       await FirebaseInitializer.initialize();
       isFirebaseInitialized = true;
-      
+
       // Set up Crashlytics only if Firebase is initialized
       if (!kDebugMode && isFirebaseInitialized) {
         // Pass all uncaught errors to Crashlytics
-        FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+        FlutterError.onError =
+            FirebaseCrashlytics.instance.recordFlutterFatalError;
       }
     } catch (e, stackTrace) {
       print("Error initializing Firebase: $e");
       print("Stack trace: $stackTrace");
-      
+
       // Check if this is the PigeonUserDetail error
       if (e.toString().contains('PigeonUserDetail')) {
         print('Detected PigeonUserDetail error during initialization');
@@ -66,9 +68,9 @@ Future<void> main() async {
 
 class MyApp extends StatefulWidget {
   final bool isFirebaseInitialized;
-  
+
   const MyApp({Key? key, this.isFirebaseInitialized = false}) : super(key: key);
-  
+
   @override
   State<MyApp> createState() => _MyAppState();
 }
@@ -78,40 +80,49 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: 'English Learning App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        useMaterial3: true,
-      ),
-      home: !widget.isFirebaseInitialized 
-          ? _buildErrorScreen()
-          : FutureBuilder<bool>(
-              future: _checkUserLoggedIn(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildLoadingScreen();
-                }
-                
-                if (snapshot.hasError) {
-                  print("Error checking login state: ${snapshot.error}");
-                  
-                  // Check if this is a PigeonUserDetail error
-                  if (snapshot.error.toString().contains('PigeonUserDetail')) {
-                    print('PigeonUserDetail error during login check - proceeding to login screen');
-                  }
-                  
-                  // If there's an error checking login, go to login screen
-                  return LoginScreen();
-                }
-                
-                final bool isLoggedIn = snapshot.data ?? false;
-                return isLoggedIn ? HomeScreen() : LoginScreen();
-              },
-            ),
-      debugShowCheckedModeBanner: false,
-    );
+    return ScreenUtilInit(
+        designSize: const Size(360, 690),
+        minTextAdapt: true,
+        splitScreenMode: true,
+        builder: (context, child) => GetMaterialApp(
+              title: 'English Learning App',
+              theme: ThemeData(
+                primarySwatch: Colors.blue,
+                visualDensity: VisualDensity.adaptivePlatformDensity,
+                useMaterial3: true,
+              ),
+              home: !widget.isFirebaseInitialized
+                  ? _buildErrorScreen()
+                  : FutureBuilder<bool>(
+                      future: _checkUserLoggedIn(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return _buildLoadingScreen();
+                        }
+
+                        if (snapshot.hasError) {
+                          print(
+                              "Error checking login state: ${snapshot.error}");
+
+                          // Check if this is a PigeonUserDetail error
+                          if (snapshot.error
+                              .toString()
+                              .contains('PigeonUserDetail')) {
+                            print(
+                                'PigeonUserDetail error during login check - proceeding to login screen');
+                          }
+
+                          // If there's an error checking login, go to login screen
+                          return LoginScreen();
+                        }
+
+                        final bool isLoggedIn = snapshot.data ?? false;
+                        return isLoggedIn ? HomeScreen() : LoginScreen();
+                      },
+                    ),
+              debugShowCheckedModeBanner: false,
+            ));
   }
 
   Widget _buildLoadingScreen() {

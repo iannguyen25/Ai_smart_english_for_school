@@ -1,9 +1,10 @@
 import 'package:base_flutter_framework/screens/flashcards/create_edit_flashcard_screen.dart';
+import 'package:base_flutter_framework/screens/folder/create_edit_folder_screen.dart';
 import 'package:base_flutter_framework/screens/home/tabs/flashcards_tab.dart';
+import 'package:base_flutter_framework/screens/home/tabs/folders_tab.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../classroom/classroom_list_screen.dart';
-import '../../classroom/classroom_detail_screen.dart';
 import '../../classroom/join_by_code_screen.dart';
 import '../../classroom/create_edit_classroom_screen.dart';
 import '../../../models/classroom.dart';
@@ -20,7 +21,7 @@ class DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<DashboardTab> {
   final ClassroomService _classroomService = ClassroomService();
   final AuthService _authService = AuthService();
-  
+
   List<Classroom> _recentClassrooms = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -38,7 +39,8 @@ class _DashboardTabState extends State<DashboardTab> {
 
       final classrooms = await _classroomService.getUserClassrooms(userId);
       setState(() {
-        _recentClassrooms = classrooms.take(3).toList(); // Chỉ lấy 3 lớp gần đây nhất
+        _recentClassrooms =
+            classrooms.take(3).toList(); // Chỉ lấy 3 lớp gần đây nhất
         _isLoading = false;
       });
     } catch (e) {
@@ -52,7 +54,7 @@ class _DashboardTabState extends State<DashboardTab> {
   @override
   Widget build(BuildContext context) {
     final user = _authService.currentUser;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
@@ -65,6 +67,7 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ],
       ),
+      backgroundColor: const Color.fromARGB(255, 166, 234, 255),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -95,14 +98,14 @@ class _DashboardTabState extends State<DashboardTab> {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Learning progress
             Text(
               'Lớp học',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
-            
+
             // Quick Actions Grid
             GridView.count(
               shrinkWrap: true,
@@ -120,23 +123,25 @@ class _DashboardTabState extends State<DashboardTab> {
                   onTap: () => Get.to(() => const ClassroomListScreen()),
                   color: Colors.blue,
                 ),
-                
+
                 // Tạo lớp học mới
                 _buildQuickActionCard(
                   icon: Icons.add_circle_outline,
                   title: 'Tạo lớp học',
                   subtitle: 'Tạo một lớp học mới',
                   onTap: () async {
-                    final result = await Get.to(() => const CreateEditClassroomScreen());
+                    final result =
+                        await Get.to(() => const CreateEditClassroomScreen());
                     if (result == true) {
                       // Refresh nếu cần
                     }
                   },
                   color: Colors.green,
                 ),
-                
+
                 // Tham gia lớp học
                 _buildQuickActionCard(
+                  width: double.infinity,
                   icon: Icons.keyboard,
                   title: 'Nhập mã lớp',
                   subtitle: 'Tham gia lớp học bằng mã',
@@ -147,17 +152,6 @@ class _DashboardTabState extends State<DashboardTab> {
                     }
                   },
                   color: Colors.orange,
-                ),
-                
-                // Tìm kiếm lớp học
-                _buildQuickActionCard(
-                  icon: Icons.search,
-                  title: 'Tìm lớp học',
-                  subtitle: 'Tìm kiếm lớp học công khai',
-                  onTap: () {
-                    // TODO: Navigate to search screen
-                  },
-                  color: Colors.purple,
                 ),
               ],
             ),
@@ -191,37 +185,56 @@ class _DashboardTabState extends State<DashboardTab> {
                   subtitle: 'Tạo flashcard mới',
                   onTap: () {
                     Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>  CreateEditFlashcardScreen(),
-                    ),
-                  );
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreateEditFlashcardScreen(),
+                      ),
+                    );
                   },
                   color: Colors.green,
                 ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            Text(
+              'Thư mục',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 1.5,
+              children: [
                 _buildQuickActionCard(
-                  icon: Icons.search,
-                  title: 'Tìm bộ thẻ flashcard',
-                  subtitle: 'Tìm kiếm bộ thẻ flashcard công khai',
-                  onTap: () {
-                    // TODO: Navigate to question creation screen
-                  },
-                  color: Colors.purple,
+                  icon: Icons.collections,
+                  title: 'Danh sách thư mục',
+                  subtitle: 'Xem tất cả thư mục của bạn',
+                  onTap: () => Get.to(() => const FoldersTab()),
+                  color: Colors.blue,
                 ),
                 _buildQuickActionCard(
                   icon: Icons.add_circle_outline,
-                  title: 'Tạo bộ thẻ flashcard',
-                  subtitle: 'Tạo bộ thẻ flashcard mới',
+                  title: 'Tạo folder',
+                  subtitle: 'Tạo folder mới',
                   onTap: () {
-                    // TODO: Navigate to question creation screen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CreateEditFolderScreen(),
+                      ),
+                    );
                   },
-                  color: Colors.orange,
+                  color: Colors.green,
                 ),
               ],
-            ),  
-            
-            // Các phần khác của Dashboard
-            // TODO: Thêm các phần khác như thống kê, tin tức, v.v.
+            ),
           ],
         ),
       ),
@@ -229,6 +242,7 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildQuickActionCard({
+    double? width,
     required IconData icon,
     required String title,
     required String subtitle,
@@ -241,6 +255,7 @@ class _DashboardTabState extends State<DashboardTab> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
+          width: width,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
@@ -267,6 +282,9 @@ class _DashboardTabState extends State<DashboardTab> {
                 children: [
                   Text(
                     title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -276,11 +294,13 @@ class _DashboardTabState extends State<DashboardTab> {
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
+                    softWrap: true,
+                    textAlign: TextAlign.start,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 12,
                     ),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -330,112 +350,4 @@ class _DashboardTabState extends State<DashboardTab> {
       ),
     );
   }
-
-  Widget _buildActionCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      color: color,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 40,
-                color: Colors.black87,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClassroomCard(Classroom classroom) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          Get.to(() => ClassroomDetailScreen(classroomId: classroom.id!));
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (classroom.coverImage != null)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: Image.network(
-                  classroom.coverImage!,
-                  height: 120,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    classroom.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  if (classroom.description.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      classroom.description,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.group,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${classroom.memberIds.length} thành viên',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(
-                        classroom.isPublic ? Icons.public : Icons.lock,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-} 
+}

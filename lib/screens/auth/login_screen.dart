@@ -6,6 +6,7 @@ import 'register_screen.dart';
 import '../home/home_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../../models/app_user.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -64,6 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 166, 234, 255),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -74,19 +76,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 40),
+                  Image.asset(
+                    'assets/images/logo_app_foreground.png',
+                    height: 200,
+                    width: 200,
+                  ),
                   Text(
-                    'English Learning App',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    'Đăng nhập',
+                    style: Theme.of(context).textTheme.headlineLarge,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
-                  Text(
-                    'Sign In',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 56),
                   if (_errorMessage != null)
                     Container(
                       padding: const EdgeInsets.all(10),
@@ -103,17 +103,30 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
                       labelText: 'Email',
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.blue, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey, width: 1),
+                      ),
                       prefixIcon: Icon(Icons.email),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return 'Nhập địa chỉ email';
                       }
                       if (!GetUtils.isEmail(value)) {
-                        return 'Please enter a valid email address';
+                        return 'Hãy nhập địa chỉ email hợp lệ';
                       }
                       return null;
                     },
@@ -122,17 +135,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
+                    maxLines: 1,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      labelText: 'Mật khẩu',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.blue, width: 2),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey, width: 1),
+                      ),
                       prefixIcon: Icon(Icons.lock),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
+                        return 'Hãy nhập mật khẩu';
                       }
                       if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return 'Mật khẩu phải có ít nhất 6 ký tự';
                       }
                       return null;
                     },
@@ -144,29 +171,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () {
                         Get.to(() => ForgotPasswordScreen());
                       },
-                      child: const Text('Forgot Password?'),
+                      child: const Text('Quên mật khẩu?'),
                     ),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: _isLoading
                         ? const CircularProgressIndicator()
-                        : const Text('Sign In'),
+                        : Text(
+                            'Đăng nhập',
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
                   ),
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Don\'t have an account?'),
+                      const Text('Không có tài khoản?'),
                       TextButton(
                         onPressed: () {
                           Get.to(() => RegisterScreen());
                         },
-                        child: const Text('Sign Up'),
+                        child: const Text('Đăng ký'),
                       ),
                     ],
                   ),

@@ -56,7 +56,7 @@ class ProfileTab extends StatelessWidget {
 
                 // User name
                 Text(
-                  user.fullName ?? 'User',
+                  user.fullName,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 4),

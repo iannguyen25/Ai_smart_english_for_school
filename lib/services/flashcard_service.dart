@@ -48,23 +48,49 @@ class FlashcardService {
   // Get all flashcards for a user
   Future<List<Flashcard>> getUserFlashcards(String userId) async {
     try {
-      final snapshot = await _flashcardsRef
+      print('Getting flashcards from Firestore for user: $userId');
+      // Lấy danh sách flashcards
+      final flashcardsSnapshot = await _firestore
+          .collection('flashcards')
           .where('userId', isEqualTo: userId)
-          // Tạm thời bỏ orderBy cho đến khi index được tạo
-          //.orderBy('updatedAt', descending: true)
+          .orderBy('updatedAt', descending: true)
           .get();
-      
-      final flashcards = snapshot.docs.map((doc) {
-        return Flashcard.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
 
-      // Sắp xếp locally
-      flashcards.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      print('Firestore query returned: ${flashcardsSnapshot.docs.length} documents');
       
+      // Tạo list flashcards với items rỗng
+      final flashcards = flashcardsSnapshot.docs
+          .map((doc) {
+            print('Processing flashcard document: ${doc.id}');
+            print('Document data: ${doc.data()}');
+            return Flashcard.fromMap(doc.data(), doc.id);
+          })
+          .toList();
+
+      // Lấy items cho từng flashcard
+      for (var flashcard in flashcards) {
+        print('Getting items for flashcard: ${flashcard.id}');
+        final itemsSnapshot = await _firestore
+            .collection('flashcard_items')
+            .where('flashcardId', isEqualTo: flashcard.id)
+            .get();
+
+        print('Found ${itemsSnapshot.docs.length} items for flashcard ${flashcard.id}');
+        
+        final items = itemsSnapshot.docs
+            .map((doc) => FlashcardItem.fromMap(doc.data(), doc.id))
+            .toList();
+
+        // Cập nhật flashcard với items
+        flashcards[flashcards.indexOf(flashcard)] = flashcard.copyWith(items: items);
+      }
+
+      print('Returning ${flashcards.length} flashcards with items');
       return flashcards;
     } catch (e) {
       print('Error getting user flashcards: $e');
-      throw 'Không thể tải danh sách bộ thẻ';
+      print('Stack trace: ${StackTrace.current}');
+      rethrow;
     }
   }
 
@@ -229,6 +255,44 @@ class FlashcardService {
     } catch (e) {
       print('Error deleting flashcard item: $e');
       throw 'Không thể xóa thẻ';
+    }
+  }
+
+  // Thêm phương thức getFlashcardsByIds
+  Future<List<Flashcard>> getFlashcardsByIds(List<String> flashcardIds) async {
+    try {
+      if (flashcardIds.isEmpty) return [];
+
+      // Lấy danh sách flashcards
+      final flashcardsSnapshot = await _firestore
+          .collection('flashcards')
+          .where(FieldPath.documentId, whereIn: flashcardIds)
+          .get();
+
+      // Tạo list flashcards với items rỗng
+      final flashcards = flashcardsSnapshot.docs
+          .map((doc) => Flashcard.fromMap(doc.data(), doc.id))
+          .toList();
+
+      // Lấy items cho từng flashcard
+      for (var flashcard in flashcards) {
+        final itemsSnapshot = await _firestore
+            .collection('flashcard_items')
+            .where('flashcardId', isEqualTo: flashcard.id)
+            .get();
+
+        final items = itemsSnapshot.docs
+            .map((doc) => FlashcardItem.fromMap(doc.data(), doc.id))
+            .toList();
+
+        // Cập nhật flashcard với items
+        flashcards[flashcards.indexOf(flashcard)] = flashcard.copyWith(items: items);
+      }
+
+      return flashcards;
+    } catch (e) {
+      print('Error getting flashcards: $e');
+      rethrow;
     }
   }
 }

@@ -5,44 +5,47 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isMember(memberIds) {
+      return request.auth.uid in memberIds;
+    }
+
     match /classrooms/{classroomId} {
-      // Cho phép read với các điều kiện cụ thể
-      allow read: if request.auth != null && (
-        // Cho phép query bằng inviteCode
+      allow read: if isAuthenticated() && (
+        resource.data.isPublic == true || 
         request.query.limit <= 1 ||
-        // Hoặc truy cập trực tiếp document
-        resource.id == classroomId
+        isOwner(resource.data.teacherId) ||
+        isMember(resource.data.memberIds) ||
+        request.auth.uid in resource.data.pendingMemberIds
       );
       
-      // Cho phép tạo lớp học
       allow create: if isAuthenticated();
       
-      // Cho phép cập nhật với điều kiện đơn giản
       allow update: if isAuthenticated() && (
-        // Là giáo viên
-        request.auth.uid == resource.data.teacherId ||
-        // HOẶC đang cập nhật pendingMemberIds
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingMemberIds'])
+        isOwner(resource.data.teacherId) ||
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['memberIds', 'pendingMemberIds', 'updatedAt']))
       );
       
-      // Chỉ giáo viên mới được xóa lớp
       allow delete: if isAuthenticated() && 
-        request.auth.uid == resource.data.teacherId;
+        isOwner(resource.data.teacherId);
+
+      allow list: if isAuthenticated();
     }
 
-    // Rules cho collection users
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && isOwner(userId);
     }
 
-    // Rules cho collection roles
     match /roles/{roleId} {
       allow read: if isAuthenticated();
       allow write: if false;
     }
 
-    // Rules cho collection flashcards
     match /flashcards/{flashcardId} {
       allow read: if isAuthenticated() && (
         resource.data.isPublic == true || 
@@ -50,13 +53,48 @@ service cloud.firestore {
       );
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
+        isOwner(resource.data.userId);
     }
 
-    // Rules cho collection flashcard_items
     match /flashcard_items/{itemId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+        isOwner(resource.data.userId);
+    }
+
+    match /folders/{folderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.isPublic == true || 
+        isOwner(resource.data.userId)
+      );
+      
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      allow update, delete: if isAuthenticated() && 
+        isOwner(resource.data.userId);
+
+      // Cho phép search folders công khai
+      allow list: if isAuthenticated() && (
+        request.query.limit <= 50 && (
+          resource.data.isPublic == true ||
+          isOwner(resource.data.userId)
+        )
+      );
+    }
+
+    match /videos/{videoId} {
+      allow read: if isAuthenticated() && (
+        resource.data.isPublic == true || 
+        isOwner(resource.data.userId)
+      );
+      
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      allow update, delete: if isAuthenticated() && 
+        isOwner(resource.data.userId);
     }
   }
 }

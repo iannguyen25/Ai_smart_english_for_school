@@ -1,3 +1,4 @@
+import 'package:base_flutter_framework/screens/classroom/join_by_code_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../models/classroom.dart';
@@ -77,6 +78,18 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
             icon: const Icon(Icons.search),
             onPressed: () {
               Get.to(() => const SearchClassroomsScreen());
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard),
+            onPressed: () async {
+              final result = await Get.to(() => const JoinByCodeScreen());
+              if (result == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tham gia lớp học thành công')),
+                );
+                _loadClassrooms(); // Reload danh sách lớp sau khi tham gia
+              }
             },
           ),
         ],
