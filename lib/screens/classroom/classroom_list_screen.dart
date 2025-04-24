@@ -82,7 +82,7 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
         _teachingClassrooms =
             classrooms.where((c) => c.teacherId == userId).toList();
         _learningClassrooms =
-            classrooms.where((c) => c.teacherId != userId).toList();
+            classrooms.where((c) => c.memberIds.contains(userId)).toList();
         _isLoading = false;
       });
     } catch (e) {

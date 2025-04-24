@@ -474,7 +474,7 @@ class AnalyticsService {
         'name': user.fullName,
         'email': user.email,
         'photoUrl': user.avatar,
-        'joinedAt': user.createdAt?.toDate(),
+        'joinedAt': user.createdAt,
         'completedLessons': completedLessons,
         'totalLessons': lessons.length,
         'completionRate': lessons.isNotEmpty ? completedLessons / lessons.length : 0,

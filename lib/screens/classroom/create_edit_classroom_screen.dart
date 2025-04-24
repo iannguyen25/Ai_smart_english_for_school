@@ -200,12 +200,7 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
         final classroom = Classroom(
           name: _nameController.text.trim(),
           description: _descriptionController.text.trim(),
-          teachers: [
-            TeacherAssignment(
-              teacherId: _auth.currentUser?.uid ?? '',
-              role: TeacherRole.mainTeacher,
-            )
-          ],
+          teacherId: _auth.currentUser?.uid ?? '',
           memberIds: _auth.currentUser?.uid != null ? [_auth.currentUser!.uid] : [],
           coverImage: coverImageUrl,
           inviteCode: _inviteCode,

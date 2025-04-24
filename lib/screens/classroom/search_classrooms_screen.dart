@@ -190,7 +190,7 @@ class _SearchClassroomsScreenState extends State<SearchClassroomsScreen> {
   Widget _buildClassroomCard(Classroom classroom) {
     final currentUser = _authService.currentUser;
     final isMember = classroom.memberIds.contains(currentUser?.id);
-    final isTeacher = classroom.teachers.any((t) => t.teacherId == currentUser?.id && t.isActive);
+    final isTeacher = classroom.teacherId == currentUser?.id;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -251,10 +251,7 @@ class _SearchClassroomsScreenState extends State<SearchClassroomsScreen> {
                       const Icon(Icons.person, size: 16, color: Colors.grey),
                       const SizedBox(width: 4),
                       FutureBuilder<String>(
-                        future: _getUserName(classroom.teachers.firstWhere(
-                          (t) => t.role == TeacherRole.mainTeacher && t.isActive,
-                          orElse: () => classroom.teachers.first,
-                        ).teacherId),
+                        future: _getUserName(classroom.teacherId),
                         builder: (context, snapshot) {
                           return Text(
                             snapshot.data ?? 'Giáo viên',
