@@ -1,5 +1,8 @@
 import 'package:base_flutter_framework/models/content_approval.dart';
+import 'package:base_flutter_framework/models/flashcard_item.dart';
 import 'package:base_flutter_framework/screens/exercises/create_exercise_screen.dart';
+import 'package:base_flutter_framework/screens/exercises/fill_in_the_blank_game.dart';
+import 'package:base_flutter_framework/screens/exercises/matching_game.dart';
 import 'package:base_flutter_framework/screens/flashcards/flashcard_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -56,6 +59,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
   int _score = 0;
   int _timeSpentSeconds = 0;
   DateTime? _startTime;
+  List<FlashcardItem> _flashcardItems = [];
   
   // Video controllers
   Map<String, dynamic> _videoControllers = {};
@@ -64,7 +68,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _startTime = DateTime.now();
     _loadLesson().then((_) {
       if (_lesson?.videos != null && _lesson!.videos.isNotEmpty) {
@@ -73,6 +77,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
     });
     _checkUserRole();
     _loadLearningProgress();
+    _loadFlashcardItems();
   }
   
   @override
@@ -94,6 +99,107 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
     super.dispose();
   }
   
+  Future<void> _loadFlashcardItems() async {
+    print('Loading flashcard items for lesson: ${widget.lessonId}');
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final flashcardService = FlashcardService();
+      final flashcards = await flashcardService.getLessonFlashcards(widget.lessonId);
+      print('Found ${flashcards.length} flashcards');
+
+      if (flashcards.isEmpty) {
+        print('No flashcards found for lesson, using mock data');
+        // Tạo dữ liệu mock
+        final mockItems = [
+          FlashcardItem(
+            flashcardId: 'mock_1',
+            question: 'Hello',
+            answer: 'Xin chào',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_2',
+            question: 'Good morning',
+            answer: 'Chào buổi sáng',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_3',
+            question: 'How are you?',
+            answer: 'Bạn khỏe không?',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_4',
+            question: 'Thank you',
+            answer: 'Cảm ơn',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_5',
+            question: 'Goodbye',
+            answer: 'Tạm biệt',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_6',
+            question: 'Please',
+            answer: 'Làm ơn',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_7',
+            question: 'Sorry',
+            answer: 'Xin lỗi',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_8',
+            question: 'Yes',
+            answer: 'Có',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_9',
+            question: 'No',
+            answer: 'Không',
+          ),
+          FlashcardItem(
+            flashcardId: 'mock_10',
+            question: 'I love you',
+            answer: 'Tôi yêu bạn',
+          ),
+        ];
+
+        setState(() {
+          _flashcardItems = mockItems;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Lấy tất cả items của các flashcard
+      List<FlashcardItem> allItems = [];
+      for (var flashcard in flashcards) {
+        print('Loading items for flashcard: ${flashcard.id}');
+        if (flashcard.id != null) {
+          final items = await flashcardService.getFlashcardItems(flashcard.id!);
+          print('Found ${items.length} items for flashcard ${flashcard.id}');
+          allItems.addAll(items);
+        }
+      }
+
+      print('Total items loaded: ${allItems.length}');
+      setState(() {
+        _flashcardItems = allItems;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading flashcard items: $e');
+      setState(() {
+        _errorMessage = 'Không thể tải flashcard: ${e.toString()}';
+        _isLoading = false;
+        _flashcardItems = [];
+      });
+    }
+  }
+
   // Tính toán thời gian học tập
   int _calculateTimeSpent() {
     if (_startTime == null) return 0;
@@ -413,6 +519,10 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
               icon: Icon(Icons.assignment),
               child: const Text('Bài tập'),
             ),
+            Tab(
+              icon: Icon(Icons.fitness_center),
+              child: const Text('Luyện tập'),
+            ),
           ],
         ),
         actions: [
@@ -495,6 +605,9 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                 
                 // Exercise Tab
                 _buildExerciseTab(),
+                
+                // Practice Tab
+                _buildPracticeTab(),
               ],
             ),
           ),
@@ -2526,4 +2639,98 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
       ),
     );
   }
-} 
+
+  Widget _buildPracticeTab() {
+    if (_flashcardItems.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.style, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            const Text(
+              'Chưa có thẻ ghi nhớ để luyện tập',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Chọn trò chơi để luyện tập',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Fill in the blank game
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.edit, color: Colors.blue),
+              title: const Text('Điền từ'),
+              subtitle: const Text('Điền từ còn thiếu vào chỗ trống'),
+              onTap: () {
+                // Lọc các flashcard items phù hợp cho trò chơi điền từ
+                final validItems = _flashcardItems.where((item) => 
+                  item.type == FlashcardItemType.textToText || 
+                  item.type == FlashcardItemType.imageToText
+                ).toList();
+
+                if (validItems.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Không có từ vựng phù hợp cho trò chơi này'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FillInTheBlankGame(
+                      items: validItems,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Matching game
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.link, color: Colors.green),
+              title: const Text('Nối từ'),
+              subtitle: const Text('Nối từ với nghĩa tương ứng'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MatchingGame(
+                      items: _flashcardItems,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}   

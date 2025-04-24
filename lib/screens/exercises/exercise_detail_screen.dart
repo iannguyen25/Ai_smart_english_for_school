@@ -57,10 +57,10 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 1, vsync: this);
     _checkUserRole();
     _loadExercise();
-    _loadFlashcardItems();
+    // _loadFlashcardItems();
   }
   
   void _checkUserRole() {
@@ -383,7 +383,6 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
             controller: _tabController,
             tabs: const [
               Tab(text: 'Kiểm tra'),
-              Tab(text: 'Luyện tập'),
             ],
           ),
           actions: [
@@ -1634,106 +1633,106 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
     }
   }
 
-  Future<void> _loadFlashcardItems() async {
-    print('Loading flashcard items for lesson: ${widget.lessonId}');
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
+  // Future<void> _loadFlashcardItems() async {
+  //   print('Loading flashcard items for lesson: ${widget.lessonId}');
+  //   try {
+  //     setState(() {
+  //       _isLoading = true;
+  //       _errorMessage = null;
+  //     });
 
-      final flashcardService = FlashcardService();
-      final flashcards = await flashcardService.getLessonFlashcards(widget.lessonId);
-      print('Found ${flashcards.length} flashcards');
+  //     final flashcardService = FlashcardService();
+  //     final flashcards = await flashcardService.getLessonFlashcards(widget.lessonId);
+  //     print('Found ${flashcards.length} flashcards');
 
-      if (flashcards.isEmpty) {
-        print('No flashcards found for lesson, using mock data');
-        // Tạo dữ liệu mock
-        final mockItems = [
-          FlashcardItem(
-            flashcardId: 'mock_1',
-            question: 'Hello',
-            answer: 'Xin chào',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_2',
-            question: 'Good morning',
-            answer: 'Chào buổi sáng',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_3',
-            question: 'How are you?',
-            answer: 'Bạn khỏe không?',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_4',
-            question: 'Thank you',
-            answer: 'Cảm ơn',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_5',
-            question: 'Goodbye',
-            answer: 'Tạm biệt',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_6',
-            question: 'Please',
-            answer: 'Làm ơn',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_7',
-            question: 'Sorry',
-            answer: 'Xin lỗi',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_8',
-            question: 'Yes',
-            answer: 'Có',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_9',
-            question: 'No',
-            answer: 'Không',
-          ),
-          FlashcardItem(
-            flashcardId: 'mock_10',
-            question: 'I love you',
-            answer: 'Tôi yêu bạn',
-          ),
-        ];
+  //     if (flashcards.isEmpty) {
+  //       print('No flashcards found for lesson, using mock data');
+  //       // Tạo dữ liệu mock
+  //       final mockItems = [
+  //         FlashcardItem(
+  //           flashcardId: 'mock_1',
+  //           question: 'Hello',
+  //           answer: 'Xin chào',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_2',
+  //           question: 'Good morning',
+  //           answer: 'Chào buổi sáng',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_3',
+  //           question: 'How are you?',
+  //           answer: 'Bạn khỏe không?',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_4',
+  //           question: 'Thank you',
+  //           answer: 'Cảm ơn',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_5',
+  //           question: 'Goodbye',
+  //           answer: 'Tạm biệt',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_6',
+  //           question: 'Please',
+  //           answer: 'Làm ơn',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_7',
+  //           question: 'Sorry',
+  //           answer: 'Xin lỗi',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_8',
+  //           question: 'Yes',
+  //           answer: 'Có',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_9',
+  //           question: 'No',
+  //           answer: 'Không',
+  //         ),
+  //         FlashcardItem(
+  //           flashcardId: 'mock_10',
+  //           question: 'I love you',
+  //           answer: 'Tôi yêu bạn',
+  //         ),
+  //       ];
 
-        setState(() {
-          _flashcardItems = mockItems;
-          _isLoading = false;
-        });
-        return;
-      }
+  //       setState(() {
+  //         _flashcardItems = mockItems;
+  //         _isLoading = false;
+  //       });
+  //       return;
+  //     }
 
-      // Lấy tất cả items của các flashcard
-      List<FlashcardItem> allItems = [];
-      for (var flashcard in flashcards) {
-        print('Loading items for flashcard: ${flashcard.id}');
-        if (flashcard.id != null) {
-          final items = await flashcardService.getFlashcardItems(flashcard.id!);
-          print('Found ${items.length} items for flashcard ${flashcard.id}');
-          allItems.addAll(items);
-        }
-      }
+  //     // Lấy tất cả items của các flashcard
+  //     List<FlashcardItem> allItems = [];
+  //     for (var flashcard in flashcards) {
+  //       print('Loading items for flashcard: ${flashcard.id}');
+  //       if (flashcard.id != null) {
+  //         final items = await flashcardService.getFlashcardItems(flashcard.id!);
+  //         print('Found ${items.length} items for flashcard ${flashcard.id}');
+  //         allItems.addAll(items);
+  //       }
+  //     }
 
-      print('Total items loaded: ${allItems.length}');
-      setState(() {
-        _flashcardItems = allItems;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading flashcard items: $e');
-      setState(() {
-        _errorMessage = 'Không thể tải flashcard: ${e.toString()}';
-        _isLoading = false;
-        _flashcardItems = [];
-      });
-    }
-  }
+  //     print('Total items loaded: ${allItems.length}');
+  //     setState(() {
+  //       _flashcardItems = allItems;
+  //       _isLoading = false;
+  //     });
+  //   } catch (e) {
+  //     print('Error loading flashcard items: $e');
+  //     setState(() {
+  //       _errorMessage = 'Không thể tải flashcard: ${e.toString()}';
+  //       _isLoading = false;
+  //       _flashcardItems = [];
+  //     });
+  //   }
+  // }
 
   Widget _buildPracticeView() {
     if (_flashcardItems.isEmpty) {
