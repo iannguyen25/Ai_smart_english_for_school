@@ -196,17 +196,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('Không có tài khoản?'),
-                      TextButton(
-                        onPressed: () {
-                          Get.to(() => RegisterScreen());
-                        },
-                        child: const Text('Đăng ký'),
-                      ),
-                    ],
+                  Text(
+                    'Liên hệ với quản trị viên để được cấp tài khoản',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
                   ),
                 ],
               ),

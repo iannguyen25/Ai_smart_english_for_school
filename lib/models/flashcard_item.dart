@@ -1,11 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum FlashcardItemType {
+  textToText,    // Text question - Text answer
+  imageToText,   // Image question - Text answer
+  textToImage,   // Text question - Image answer
+  imageToImage,  // Image question - Image answer
+  imageOnly,     // Single image, no text or illustration
+}
+
 class FlashcardItem {
   final String? id;
   final String flashcardId;
-  final String question;
-  final String answer;
-  final String? image;
+  final String question;           // Text question
+  final String answer;            // Text answer
+  final String? questionImage;    // Image URL for question
+  final String? answerImage;      // Image URL for answer
+  final FlashcardItemType type;   // Type of flashcard
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -14,7 +24,9 @@ class FlashcardItem {
     required this.flashcardId,
     required this.question,
     required this.answer,
-    this.image,
+    this.questionImage,
+    this.answerImage,
+    this.type = FlashcardItemType.textToText,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) :
@@ -27,7 +39,12 @@ class FlashcardItem {
       flashcardId: map['flashcardId'] ?? '',
       question: map['question'] ?? '',
       answer: map['answer'] ?? '',
-      image: map['image'],
+      questionImage: map['questionImage'],
+      answerImage: map['answerImage'],
+      type: FlashcardItemType.values.firstWhere(
+        (e) => e.toString() == map['type'],
+        orElse: () => FlashcardItemType.textToText,
+      ),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
     );
@@ -38,7 +55,9 @@ class FlashcardItem {
       'flashcardId': flashcardId,
       'question': question,
       'answer': answer,
-      'image': image,
+      'questionImage': questionImage,
+      'answerImage': answerImage,
+      'type': type.toString(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -48,7 +67,9 @@ class FlashcardItem {
     String? flashcardId,
     String? question,
     String? answer,
-    String? image,
+    String? questionImage,
+    String? answerImage,
+    FlashcardItemType? type,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -57,7 +78,9 @@ class FlashcardItem {
       flashcardId: flashcardId ?? this.flashcardId,
       question: question ?? this.question,
       answer: answer ?? this.answer,
-      image: image ?? this.image,
+      questionImage: questionImage ?? this.questionImage,
+      answerImage: answerImage ?? this.answerImage,
+      type: type ?? this.type,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

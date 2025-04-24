@@ -1,22 +1,25 @@
-import 'package:base_flutter_framework/module/home/binding/home_binding.dart';
-import 'package:base_flutter_framework/module/home/view/home_screen.dart';
-import 'package:base_flutter_framework/module/splash/binding/splash_binding.dart';
-import 'package:base_flutter_framework/module/splash/view/splash_screen.dart';
 import 'package:get/get.dart';
+import '../screens/exercises/create_exercise_screen.dart';
+import '../screens/home/home_screen.dart' as app_home;
+import '../screens/splash/splash_screen.dart';
 
-part 'app_routes.dart';
+abstract class Routes {
+  static const SPLASH = '/splash';
+  static const HOME = '/home';
+  static const EXERCISES_CREATE = '/exercises/create';
+}
 
-const INITIAL = Routes.HOME;
+class AppPages {
+  static const INITIAL = Routes.SPLASH;
 
-final routePages = [
-  GetPage(
-    name: Routes.SPLASH,
-    page: () => SplashScreen(),
-    binding: SplashBinding(),
-  ),
-  GetPage(
-    name: Routes.HOME,
-    page: () => HomeScreen(),
-    binding: HomeBinding(),
-  ),
-];
+  static final routesPages = [
+    GetPage(
+      name: Routes.SPLASH,
+      page: () => const SplashScreen(),
+    ),
+    GetPage(
+      name: Routes.HOME,
+      page: () => const app_home.HomeScreen(),
+    )
+  ];
+}

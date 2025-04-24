@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
       enableLog: true,
       initialRoute: Routes.SPLASH,
       defaultTransition: Transition.fade,
-      getPages: routePages,
+      getPages: AppPages.routesPages,
       initialBinding: AppBinding(),
       smartManagement: SmartManagement.keepFactory,
       title: APP_NAME,

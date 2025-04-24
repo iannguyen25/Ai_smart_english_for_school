@@ -86,7 +86,7 @@ class _SearchClassroomsScreenState extends State<SearchClassroomsScreen> {
           decoration: InputDecoration(
             hintText: 'Tìm kiếm lớp học...',
             border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.grey.shade300),
+            hintStyle: TextStyle(color: Colors.black.withOpacity(0.5)),
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear),
@@ -99,7 +99,7 @@ class _SearchClassroomsScreenState extends State<SearchClassroomsScreen> {
                   )
                 : null,
           ),
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.black),
           autofocus: true,
         ),
       ),
@@ -190,7 +190,7 @@ class _SearchClassroomsScreenState extends State<SearchClassroomsScreen> {
   Widget _buildClassroomCard(Classroom classroom) {
     final currentUser = _authService.currentUser;
     final isMember = classroom.memberIds.contains(currentUser?.id);
-    final isTeacher = classroom.teacherId == currentUser?.id;
+    final isTeacher = classroom.teachers.any((t) => t.teacherId == currentUser?.id && t.isActive);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -251,7 +251,10 @@ class _SearchClassroomsScreenState extends State<SearchClassroomsScreen> {
                       const Icon(Icons.person, size: 16, color: Colors.grey),
                       const SizedBox(width: 4),
                       FutureBuilder<String>(
-                        future: _getUserName(classroom.teacherId),
+                        future: _getUserName(classroom.teachers.firstWhere(
+                          (t) => t.role == TeacherRole.mainTeacher && t.isActive,
+                          orElse: () => classroom.teachers.first,
+                        ).teacherId),
                         builder: (context, snapshot) {
                           return Text(
                             snapshot.data ?? 'Giáo viên',

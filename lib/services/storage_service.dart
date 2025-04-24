@@ -48,4 +48,23 @@ class StorageService {
       // Don't throw error as this is not critical
     }
   }
+
+  Future<String?> uploadFlashcardImage(String userId, String flashcardId, File file) async {
+    try {
+      final fileName = path.basename(file.path);
+      final ref = _storage.ref()
+          .child('flashcards')
+          .child(userId)
+          .child(flashcardId)
+          .child(fileName);
+
+      final uploadTask = ref.putFile(file);
+      final snapshot = await uploadTask;
+      
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading flashcard image: $e');
+      return null;
+    }
+  }
 }

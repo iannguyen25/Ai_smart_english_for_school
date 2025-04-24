@@ -37,13 +37,15 @@ class AuthService {
 
     if (firebaseUser != null) {
       try {
-        final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+        final doc =
+            await _firestore.collection('users').doc(firebaseUser.uid).get();
         print('Init Current User - User Document: ${doc.data()}'); // Debug log
 
         if (doc.exists) {
           _currentUser = User.fromMap(doc.data()!, doc.id);
           _currentUserController.add(_currentUser); // Thông báo thay đổi
-          print('Init Current User - Current User set to: $_currentUser'); // Debug log
+          print(
+              'Init Current User - Current User set to: $_currentUser'); // Debug log
         }
       } catch (e) {
         print('Error initializing current user: $e');
@@ -64,11 +66,13 @@ class AuthService {
 
       if (firebaseUser != null) {
         try {
-          final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+          final doc =
+              await _firestore.collection('users').doc(firebaseUser.uid).get();
           if (doc.exists) {
             _currentUser = User.fromMap(doc.data()!, doc.id);
             _currentUserController.add(_currentUser);
-            print('Auth State Changed - Current User set to: $_currentUser'); // Debug log
+            print(
+                'Auth State Changed - Current User set to: $_currentUser'); // Debug log
           }
         } catch (e) {
           print('Error updating current user: $e');
@@ -453,5 +457,62 @@ class AuthService {
   void clearUserFromCache(String userId) {
     _userCache.remove(userId);
     _cacheTimestamps.remove(userId);
+  }
+
+  // Refresh user data from Firestore
+  Future<void> refreshUserData(String userId) async {
+    try {
+      print('Refreshing user data for ID: $userId');
+      final doc = await _firestore.collection('users').doc(userId).get();
+
+      if (!doc.exists) {
+        print('User document not found');
+        return;
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+
+      // Chuyển đổi Timestamp thành DateTime khi đọc từ Firestore
+      final createdAt = data['createdAt'] as Timestamp?;
+      final updatedAt = data['updatedAt'] as Timestamp?;
+
+      final refreshedUser = app_models.User(
+        id: doc.id,
+        email: data['email'] ?? '',
+        firstName: data['firstName'] ?? '',
+        lastName: data['lastName'] ?? '',
+        avatar: data['avatar'],
+        roleId: data['roleId'] ?? '',
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
+
+      // Cập nhật currentUser và thông báo thay đổi
+      _currentUser = refreshedUser;
+      _currentUserController.add(_currentUser);
+
+      print('User data refreshed successfully: ${_currentUser?.avatar}');
+    } catch (e) {
+      print('Error refreshing user data: $e');
+      rethrow;
+    }
+  }
+
+  firebase_auth.User? get currentFirebaseUser => _auth.currentUser;
+  
+  // Kiểm tra xem người dùng hiện tại có phải là quản trị viên hay không
+  // Giả sử roleId = 'admin' là quản trị viên
+  bool get isCurrentUserAdmin {
+    final user = currentUser;
+    // Kiểm tra roleId được thiết lập là 'admin'
+    return user?.roleId == 'admin';
+  }
+  
+  // Kiểm tra xem người dùng hiện tại có phải là giáo viên không
+  // Giả sử roleId = 'teacher' là giáo viên
+  bool get isCurrentUserTeacher {
+    final user = currentUser;
+    // Kiểm tra roleId được thiết lập là 'teacher'
+    return user?.roleId == 'teacher';
   }
 }

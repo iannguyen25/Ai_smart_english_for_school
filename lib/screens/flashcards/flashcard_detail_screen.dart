@@ -6,6 +6,7 @@ import '../../models/flashcard_item.dart';
 import '../../services/auth_service.dart';
 import '../../services/flashcard_service.dart';
 import 'create_edit_flashcard_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FlashcardDetailScreen extends StatefulWidget {
   final String flashcardId;
@@ -24,11 +25,56 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
   Flashcard? _flashcard;
   List<FlashcardItem> _items = [];
   bool _isOwner = false;
+  bool _isTeacher = false;
+  bool _hasEditPermission = false;
+  
+  // Thêm ScrollController và biến để theo dõi trạng thái cuộn
+  late ScrollController _scrollController;
+  double _scrollOffset = 0.0;
+  Color _appBarColor = Colors.green.shade700;
+  Color _appBarColorCollapsed = Colors.green.shade900;
+  bool _isScrolled = false;
 
   @override
   void initState() {
     super.initState();
+    
+    // Khởi tạo ScrollController và lắng nghe sự kiện cuộn
+    _scrollController = ScrollController()
+      ..addListener(_onScroll);
+      
     _loadFlashcardData();
+  }
+  
+  void _onScroll() {
+    // Tính toán tỷ lệ cuộn (từ 0.0 đến 1.0)
+    final double offset = _scrollController.offset;
+    final double maxExtent = 180.0; // Chiều cao tối đa của SliverAppBar
+    
+    // Giới hạn tỷ lệ từ 0.0 đến 1.0
+    final double scrollRatio = (offset / maxExtent).clamp(0.0, 1.0);
+    final bool isScrolled = scrollRatio > 0.1;
+    
+    if (mounted && (_scrollOffset != scrollRatio || _isScrolled != isScrolled)) {
+      setState(() {
+        _scrollOffset = scrollRatio;
+        _isScrolled = isScrolled;
+        
+        // Tính toán màu gradient dựa trên tỷ lệ cuộn
+        _appBarColor = Color.lerp(
+          Colors.green.shade700,
+          _appBarColorCollapsed,
+          scrollRatio
+        )!;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadFlashcardData() async {
@@ -52,6 +98,48 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
       // Kiểm tra quyền sở hữu
       final currentUser = _authService.currentUser;
       final isOwner = currentUser != null && currentUser.id == flashcard.userId;
+      
+      // Kiểm tra nếu là giáo viên
+      bool isTeacher = false;
+      bool hasEditPermission = isOwner;
+      
+      if (currentUser != null) {
+        // Nếu có classroomId, kiểm tra xem người dùng có phải là giáo viên của lớp không
+        if (flashcard.classroomId != null) {
+          try {
+            final classroom = await FirebaseFirestore.instance
+                .collection('classrooms')
+                .doc(flashcard.classroomId)
+                .get();
+                
+            if (classroom.exists) {
+              final teacherId = classroom.data()?['teacherId'];
+              isTeacher = teacherId == currentUser.id;
+              hasEditPermission = isOwner || isTeacher;
+            }
+          } catch (e) {
+            print('Error checking teacher status: $e');
+          }
+        }
+        
+        // Nếu có lessonId, kiểm tra xem người dùng có phải là giáo viên tạo bài học không
+        if (!isTeacher && flashcard.lessonId != null) {
+          try {
+            final lesson = await FirebaseFirestore.instance
+                .collection('lessons')
+                .doc(flashcard.lessonId)
+                .get();
+                
+            if (lesson.exists) {
+              final teacherId = lesson.data()?['teacherId'];
+              isTeacher = teacherId == currentUser.id;
+              hasEditPermission = isOwner || isTeacher;
+            }
+          } catch (e) {
+            print('Error checking lesson teacher status: $e');
+          }
+        }
+      }
 
       // Tải các thẻ
       final items = await _flashcardService.getFlashcardItems(widget.flashcardId);
@@ -60,6 +148,8 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
         _flashcard = flashcard;
         _items = items;
         _isOwner = isOwner;
+        _isTeacher = isTeacher;
+        _hasEditPermission = hasEditPermission;
         _isLoading = false;
       });
     } catch (e) {
@@ -73,131 +163,328 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_flashcard?.title ?? 'Chi tiết bộ thẻ'),
-        actions: [
-          if (_isOwner && _flashcard != null)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () async {
-                final result = await Get.to(() => CreateEditFlashcardScreen(flashcard: _flashcard));
-                if (result == true) {
-                  _loadFlashcardData();
-                }
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: _flashcard == null ? null : () => _showOptions(),
-          ),
-        ],
-      ),
-      body: _buildBody(),
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? _buildErrorState()
+              : _flashcard == null
+                  ? const Center(child: Text('Không tìm thấy bộ thẻ'))
+                  : NestedScrollView(
+                      controller: _scrollController,
+                      headerSliverBuilder: (context, innerBoxIsScrolled) {
+                        return [
+                          SliverAppBar(
+                            expandedHeight: 180.0,
+                            floating: false,
+                            pinned: true,
+                            elevation: _isScrolled ? 4 : 0,
+                            backgroundColor: _appBarColor,
+                            flexibleSpace: FlexibleSpaceBar(
+                              title: AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 200),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16 - _scrollOffset * 2, // Giảm kích thước font khi cuộn
+                                ),
+                                child: Text(_flashcard!.title),
+                              ),
+                              titlePadding: EdgeInsets.lerp(
+                                const EdgeInsets.only(left: 16, bottom: 16),
+                                const EdgeInsets.only(left: 56, bottom: 16),
+                                _scrollOffset
+                              ),
+                              collapseMode: CollapseMode.pin,
+                              background: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      _appBarColor,
+                                      Color.lerp(Colors.green.shade500, _appBarColorCollapsed, _scrollOffset)!,
+                                    ],
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned(
+                                      right: -50,
+                                      top: -20,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        width: 200 * (1 - _scrollOffset * 0.5),
+                                        height: 200 * (1 - _scrollOffset * 0.5),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.1 * (1 - _scrollOffset * 0.5)),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      left: -30,
+                                      bottom: -50,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        width: 180 * (1 - _scrollOffset * 0.5),
+                                        height: 180 * (1 - _scrollOffset * 0.5),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.1 * (1 - _scrollOffset * 0.5)),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 70 * (1 - _scrollOffset),
+                                      left: 0,
+                                      right: 0,
+                                      child: AnimatedOpacity(
+                                        opacity: 1 - _scrollOffset,
+                                        duration: const Duration(milliseconds: 200),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 8),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                _flashcard!.description,
+                                                style: TextStyle(
+                                                  color:
+                                                      Colors.white.withOpacity(0.9),
+                                                  fontSize: 14,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    _flashcard!.isPublic
+                                                        ? Icons.public
+                                                        : Icons.lock,
+                                                    color: Colors.white70,
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    _flashcard!.isPublic
+                                                        ? 'Công khai'
+                                                        : 'Riêng tư',
+                                                    style: const TextStyle(
+                                                      color: Colors.white70,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            actions: [
+                              if (_hasEditPermission && _flashcard != null)
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.white),
+                                  onPressed: () async {
+                                    final result = await Get.to(() =>
+                                        CreateEditFlashcardScreen(
+                                            flashcard: _flashcard));
+                                    if (result == true) {
+                                      _loadFlashcardData();
+                                    }
+                                  },
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.more_vert, color: Colors.white),
+                                onPressed: _flashcard == null ? null : () => _showOptions(),
+                              ),
+                            ],
+                          ),
+                        ];
+                      },
+                      body: _buildFlashcardContent(),
+                    ),
       floatingActionButton: _items.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: () {
                 Get.to(() => FlashcardPracticeScreen(
-                  flashcard: _flashcard!,
-                  items: _items,
-                ));
+                      flashcard: _flashcard!,
+                      items: _items,
+                    ));
               },
               icon: const Icon(Icons.play_arrow),
               label: const Text('Luyện tập'),
+              backgroundColor: Colors.green.shade700,
             )
           : null,
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(_errorMessage!, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadFlashcardData,
-              child: const Text('Thử lại'),
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.red.shade100,
+              shape: BoxShape.circle,
             ),
-          ],
-        ),
-      );
-    }
+            child: Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red.shade700,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Đã xảy ra lỗi',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadFlashcardData,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Thử lại'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    if (_flashcard == null) {
-      return const Center(
-        child: Text('Không tìm thấy bộ thẻ'),
-      );
-    }
-
+  Widget _buildFlashcardContent() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Thông tin bộ thẻ
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _flashcard!.title,
-                          style: Theme.of(context).textTheme.headlineSmall,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.person,
+                        color: Colors.green.shade700,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FutureBuilder<String>(
+                            future: _getUserName(_flashcard!.userId),
+                            builder: (context, snapshot) {
+                              return Text(
+                                snapshot.data ?? 'Người dùng',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              );
+                            },
+                          ),
+                          Text(
+                            'Tác giả',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.access_time,
+                        color: Colors.amber.shade700,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _formatDate(_flashcard!.createdAt),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      Icon(
-                        _flashcard!.isPublic ? Icons.public : Icons.lock,
-                        color: Colors.grey,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _flashcard!.description,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.person, size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      FutureBuilder<String>(
-                        future: _getUserName(_flashcard!.userId),
-                        builder: (context, snapshot) {
-                          return Text(
-                            snapshot.data ?? 'Người dùng',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 16),
-                      const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDate(_flashcard!.createdAt),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                        Text(
+                          'Ngày tạo',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -206,56 +493,56 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Thẻ (${_items.length})',
-                style: Theme.of(context).textTheme.titleLarge,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.style,
+                      color: Colors.green.shade700,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Thẻ (${_items.length})',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              if (_isOwner)
+              if (_hasEditPermission)
                 ElevatedButton.icon(
                   onPressed: () async {
-                    final result = await Get.to(() => CreateEditFlashcardScreen(flashcard: _flashcard));
+                    final result = await Get.to(() =>
+                        CreateEditFlashcardScreen(flashcard: _flashcard));
                     if (result == true) {
                       _loadFlashcardData();
                     }
                   },
-                  icon: const Icon(Icons.edit),
+                  icon: const Icon(Icons.edit, size: 16),
                   label: const Text('Chỉnh sửa'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 16),
 
           if (_items.isEmpty)
-            Center(
-              child: Column(
-                children: [
-                  const SizedBox(height: 32),
-                  Icon(
-                    Icons.note_alt_outlined,
-                    size: 64,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Chưa có thẻ nào trong bộ này',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  if (_isOwner)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final result = await Get.to(() => CreateEditFlashcardScreen(flashcard: _flashcard));
-                          if (result == true) {
-                            _loadFlashcardData();
-                          }
-                        },
-                        child: const Text('Thêm thẻ'),
-                      ),
-                    ),
-                ],
-              ),
-            )
+            _buildEmptyState()
           else
             ListView.builder(
               shrinkWrap: true,
@@ -263,7 +550,7 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
               itemCount: _items.length,
               itemBuilder: (context, index) {
                 final item = _items[index];
-                return _buildFlashcardItemCard(item, index);
+                return _buildFlashcardItem(item, index);
               },
             ),
         ],
@@ -271,73 +558,337 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
     );
   }
 
-  Widget _buildFlashcardItemCard(FlashcardItem item, int index) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: () {
-          _showFlashcardItemDetail(item);
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Thẻ ${index + 1}',
-                    style: Theme.of(context).textTheme.titleMedium,
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      alignment: Alignment.center,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.note_alt_outlined,
+              size: 64,
+              color: Colors.green.shade700,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Chưa có thẻ nào trong bộ này',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Thêm thẻ để bắt đầu học',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
+            ),
+          ),
+          if (_hasEditPermission)
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Get.to(() =>
+                      CreateEditFlashcardScreen(flashcard: _flashcard));
+                  if (result == true) {
+                    _loadFlashcardData();
+                  }
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Thêm thẻ mới'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  if (_isOwner)
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () async {
-                        final result = await Get.to(() => CreateEditFlashcardScreen(flashcard: _flashcard));
-                        if (result == true) {
-                          _loadFlashcardData();
-                        }
-                      },
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFlashcardItem(FlashcardItem item, int index) {
+    // Tạo màu dựa trên index
+    final colorIndex = index % 5;
+    final cardColors = [
+      Colors.blue.shade50,
+      Colors.green.shade50,
+      Colors.purple.shade50,
+      Colors.orange.shade50,
+      Colors.teal.shade50,
+    ];
+    final iconColors = [
+      Colors.blue.shade700,
+      Colors.green.shade700,
+      Colors.purple.shade700,
+      Colors.orange.shade700,
+      Colors.teal.shade700,
+    ];
+
+    return GestureDetector(
+      onTap: () => _showFlashcardItemDetail(item),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardColors[colorIndex],
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                     ),
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        color: iconColors[colorIndex],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Thẻ ${index + 1}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: iconColors[colorIndex],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Câu hỏi:',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (item.type == FlashcardItemType.imageOnly && item.questionImage != null && item.questionImage!.isNotEmpty)
+                    // Hiển thị chỉ ảnh cho kiểu imageOnly
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        item.questionImage!,
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  else if (item.type == FlashcardItemType.imageToImage) ...[
+                    // Hiển thị cả 2 ảnh cho kiểu imageToImage
+                    if (item.questionImage != null && item.questionImage!.isNotEmpty) ...[
+                      Text(
+                        'Ảnh từ vựng',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          item.questionImage!,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    if (item.answerImage != null && item.answerImage!.isNotEmpty) ...[
+                      Text(
+                        'Ảnh minh họa',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          item.answerImage!,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                  ]
+                  else ...[
+                    // Hiển thị các kiểu khác như cũ
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.text_fields,
+                            color: Colors.green.shade700,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Từ',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                item.question,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.translate,
+                            color: Colors.blue.shade700,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Định nghĩa',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                item.answer,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (item.type != FlashcardItemType.imageOnly && 
+                      item.type != FlashcardItemType.imageToImage && 
+                      item.answerImage != null && 
+                      item.answerImage!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.image,
+                            color: Colors.purple.shade700,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ảnh minh họa',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  item.answerImage!,
+                                  width: double.infinity,
+                                  height: 150,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                item.question,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Câu trả lời:',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.answer,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              if (item.image != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Image.network(
-                    item.image!,
-                    height: 100,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -393,7 +944,7 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
                     item.answer,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                  if (item.image != null) ...[
+                  if (item.answerImage != null) ...[
                     const SizedBox(height: 24),
                     Text(
                       'Hình ảnh:',
@@ -401,12 +952,12 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Image.network(
-                      item.image!,
+                      item.answerImage!,
                       fit: BoxFit.cover,
                     ),
                   ],
                   const SizedBox(height: 32),
-                  if (_isOwner)
+                  if (_hasEditPermission)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -502,7 +1053,7 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_isOwner) ...[
+              if (_hasEditPermission) ...[
                 ListTile(
                   leading: const Icon(Icons.edit),
                   title: const Text('Chỉnh sửa'),

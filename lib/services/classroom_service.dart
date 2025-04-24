@@ -3,6 +3,7 @@ import 'dart:math';
 import '../models/classroom.dart';
 import 'storage_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/course.dart';
 
 class ClassroomService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -18,47 +19,33 @@ class ClassroomService {
   }
 
   // Tạo lớp học mới
-  Future<String> createClassroom({
-    required String name,
-    required String description,
-    required String teacherId,
-    String? coverImage,
-    bool isPublic = false,
-  }) async {
+  Future<String?> createClassroom(Classroom classroom) async {
     try {
-      final inviteCode = _generateInviteCode();
-
-      final classroom = Classroom(
-        name: name,
-        description: description,
-        teacherId: teacherId,
-        memberIds: [teacherId], // Tự động thêm giáo viên vào danh sách thành viên
-        coverImage: coverImage,
-        inviteCode: inviteCode,
-        isPublic: isPublic,
-      );
-
+      // Tạo lớp học
       final docRef = await _classroomsRef.add(classroom.toMap());
+      
+      // Nếu có courseId, sao chép học liệu từ khóa học
+      if (classroom.courseId != null) {
+        await copyCourseContentToClassroom(classroom.courseId!, docRef.id);
+      }
+      
       return docRef.id;
     } catch (e) {
       print('Error creating classroom: $e');
-      throw 'Không thể tạo lớp học';
+      return null;
     }
   }
 
   // Cập nhật thông tin lớp học
-  Future<void> updateClassroom(Classroom classroom) async {
+  Future<bool> updateClassroom(Classroom classroom) async {
     try {
-      await _classroomsRef.doc(classroom.id).update({
-        'name': classroom.name,
-        'description': classroom.description,
-        'coverImage': classroom.coverImage,
-        'isPublic': classroom.isPublic,
-        'updatedAt': Timestamp.now(),
-      });
+      if (classroom.id == null) return false;
+      
+      await _classroomsRef.doc(classroom.id).update(classroom.toMap());
+      return true;
     } catch (e) {
       print('Error updating classroom: $e');
-      throw 'Không thể cập nhật lớp học';
+      return false;
     }
   }
 
@@ -227,18 +214,16 @@ class ClassroomService {
   }
 
   // Lấy thông tin lớp học theo ID
-  Future<Classroom> getClassroomById(String classroomId) async {
+  Future<Classroom?> getClassroom(String classroomId) async {
     try {
       final doc = await _classroomsRef.doc(classroomId).get();
-
-      if (!doc.exists) {
-        throw 'Không tìm thấy lớp học';
+      if (doc.exists) {
+        return Classroom.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }
-
-      return Classroom.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      return null;
     } catch (e) {
       print('Error getting classroom: $e');
-      throw 'Không thể tải thông tin lớp học';
+      return null;
     }
   }
 
@@ -327,33 +312,110 @@ class ClassroomService {
   }
 
   // Thêm phương thức để giáo viên duyệt yêu cầu
-  Future<void> approveMember(String classroomId, String userId) async {
+  Future<bool> approveStudent(String classroomId, String userId) async {
     try {
-      final doc = await _firestore.collection('classrooms').doc(classroomId).get();
-      if (!doc.exists) throw 'Lớp học không tồn tại';
-
-      await doc.reference.update({
+      final classroom = await getClassroom(classroomId);
+      if (classroom == null) return false;
+      
+      // Kiểm tra xem có trong danh sách chờ không
+      if (!classroom.pendingMemberIds.contains(userId)) {
+        return false;
+      }
+      
+      // Cập nhật Firestore (atomic operation)
+      await _firestore.collection('classrooms').doc(classroomId).update({
         'memberIds': FieldValue.arrayUnion([userId]),
         'pendingMemberIds': FieldValue.arrayRemove([userId]),
+        'updatedAt': Timestamp.now(),
       });
+      
+      return true;
     } catch (e) {
-      print('Error approving member: $e');
-      rethrow;
+      print('Error approving student: $e');
+      return false;
     }
   }
 
   // Thêm phương thức để giáo viên từ chối yêu cầu
-  Future<void> rejectMember(String classroomId, String userId) async {
+  Future<bool> rejectStudent(String classroomId, String userId) async {
     try {
-      final doc = await _firestore.collection('classrooms').doc(classroomId).get();
-      if (!doc.exists) throw 'Lớp học không tồn tại';
-
-      await doc.reference.update({
-        'pendingMemberIds': FieldValue.arrayRemove([userId])
+      // Xóa khỏi danh sách chờ
+      await _firestore.collection('classrooms').doc(classroomId).update({
+        'pendingMemberIds': FieldValue.arrayRemove([userId]),
+        'updatedAt': Timestamp.now(),
       });
+      
+      return true;
     } catch (e) {
-      print('Error rejecting member: $e');
-      rethrow;
+      print('Error rejecting student: $e');
+      return false;
+    }
+  }
+
+  // Sao chép học liệu từ khóa học sang lớp học
+  Future<bool> copyCourseContentToClassroom(String courseId, String classroomId) async {
+    try {
+      // Lấy thông tin khóa học
+      final courseDoc = await _firestore.collection('courses').doc(courseId).get();
+      if (!courseDoc.exists) return false;
+      
+      final course = Course.fromMap(courseDoc.data()!, courseId);
+      
+      // Sao chép bài học
+      List<String> newLessonIds = [];
+      if (course.materialIds.isNotEmpty) {
+        // Lấy tất cả bài học từ khóa học
+        final lessonSnapshot = await _firestore.collection('learning_materials')
+            .where('id', whereIn: course.materialIds)
+            .get();
+            
+        // Sao chép từng bài học
+        for (var doc in lessonSnapshot.docs) {
+          final lessonData = doc.data();
+          lessonData['classroomId'] = classroomId;
+          lessonData['isCustom'] = true;
+          lessonData['createdAt'] = Timestamp.now();
+          lessonData['updatedAt'] = Timestamp.now();
+          
+          // Tạo bài học mới
+          final newLessonRef = await _firestore.collection('learning_materials').add(lessonData);
+          newLessonIds.add(newLessonRef.id);
+        }
+      }
+      
+      // Sao chép bộ flashcard
+      List<String> newFlashcardIds = [];
+      if (course.templateFlashcardIds.isNotEmpty) {
+        // Lấy tất cả flashcard từ khóa học
+        final flashcardSnapshot = await _firestore.collection('flashcards')
+            .where('id', whereIn: course.templateFlashcardIds)
+            .get();
+            
+        // Sao chép từng flashcard
+        for (var doc in flashcardSnapshot.docs) {
+          final flashcardData = doc.data();
+          flashcardData['classroomId'] = classroomId;
+          flashcardData['isCustom'] = true;
+          flashcardData['createdAt'] = Timestamp.now();
+          flashcardData['updatedAt'] = Timestamp.now();
+          
+          // Tạo flashcard mới
+          final newFlashcardRef = await _firestore.collection('flashcards').add(flashcardData);
+          newFlashcardIds.add(newFlashcardRef.id);
+        }
+      }
+      
+      // Cập nhật lớp học với ID học liệu đã sao chép
+      await _firestore.collection('classrooms').doc(classroomId).update({
+        'customLessonIds': FieldValue.arrayUnion(newLessonIds),
+        'customFlashcardIds': FieldValue.arrayUnion(newFlashcardIds),
+        'updatedAt': Timestamp.now(),
+      });
+      
+      return true;
+    } catch (e) {
+      print('Error copying course content: $e');
+      return false;
     }
   }
 }

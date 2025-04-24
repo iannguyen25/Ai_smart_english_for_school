@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../firebase_options.dart';
 import 'role_service.dart';
+import 'notification_service.dart';
 
 class FirebaseInitializer {
   static Future<void> initialize() async {
@@ -26,6 +27,9 @@ class FirebaseInitializer {
       
       // Initialize default roles
       await _initializeDefaultData();
+      
+      // Initialize Firebase Cloud Messaging
+      await _initializeNotifications();
     } catch (e) {
       print('Error initializing Firebase: $e');
       if (kDebugMode) {
@@ -43,6 +47,18 @@ class FirebaseInitializer {
       print('Default data initialized');
     } catch (e) {
       print('Error initializing default data: $e');
+      // Continue execution even if this fails
+    }
+  }
+  
+  static Future<void> _initializeNotifications() async {
+    try {
+      // Initialize FCM
+      final notificationService = NotificationService();
+      await notificationService.initialize();
+      print('FCM initialized successfully');
+    } catch (e) {
+      print('Error initializing FCM: $e');
       // Continue execution even if this fails
     }
   }

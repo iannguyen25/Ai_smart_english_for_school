@@ -12,33 +12,81 @@ class VideoService {
   // Upload video
   Future<String> uploadVideo(File videoFile, String userId) async {
     try {
+      print('Starting video upload for user: $userId');
       // Tạo tên file ngẫu nhiên
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${userId}.mp4';
       final ref = _storage.ref().child('videos/$fileName');
 
-      // Upload video
-      final uploadTask = await ref.putFile(videoFile);
-      final videoUrl = await uploadTask.ref.getDownloadURL();
-
-      // Tạo thumbnail
-      final thumbnailPath = await VideoThumbnail.thumbnailFile(
-        video: videoUrl,
-        thumbnailPath: (await getTemporaryDirectory()).path,
-        imageFormat: ImageFormat.JPEG,
-        quality: 75,
+      // Upload video với metadata
+      final metadata = SettableMetadata(
+        contentType: 'video/mp4',
+        customMetadata: {'userId': userId},
       );
 
+      // Upload với retry logic
+      String videoUrl = '';
+      int retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          print('Upload attempt ${retryCount + 1}');
+          // Upload video
+          final uploadTask = ref.putFile(videoFile, metadata);
+          
+          // Theo dõi tiến trình upload
+          uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+            print('Upload progress: ${(progress * 100).toStringAsFixed(2)}%');
+          });
+          
+          // Đợi upload hoàn tất
+          await uploadTask;
+          
+          // Lấy URL của video
+          videoUrl = await ref.getDownloadURL();
+          print('Video uploaded successfully: $videoUrl');
+          break; // Thoát khỏi vòng lặp nếu thành công
+        } catch (e) {
+          retryCount++;
+          print('Upload attempt failed: $e');
+          if (retryCount >= maxRetries) {
+            rethrow; // Ném lại lỗi nếu đã thử hết số lần
+          }
+          // Đợi trước khi thử lại
+          await Future.delayed(Duration(seconds: 2 * retryCount));
+        }
+      }
+
+      // Tạo thumbnail
       String? thumbnailUrl;
-      if (thumbnailPath != null) {
-        final thumbnailRef = _storage.ref().child('thumbnails/$fileName.jpg');
-        final thumbnailUpload = await thumbnailRef.putFile(File(thumbnailPath));
-        thumbnailUrl = await thumbnailUpload.ref.getDownloadURL();
+      try {
+        final thumbnailPath = await VideoThumbnail.thumbnailFile(
+          video: videoUrl,
+          thumbnailPath: (await getTemporaryDirectory()).path,
+          imageFormat: ImageFormat.JPEG,
+          quality: 75,
+        );
+
+        if (thumbnailPath != null) {
+          final thumbnailRef = _storage.ref().child('thumbnails/$fileName.jpg');
+          final thumbnailMetadata = SettableMetadata(
+            contentType: 'image/jpeg',
+            customMetadata: {'userId': userId},
+          );
+          final thumbnailUpload = await thumbnailRef.putFile(File(thumbnailPath), thumbnailMetadata);
+          thumbnailUrl = await thumbnailUpload.ref.getDownloadURL();
+          print('Thumbnail created: $thumbnailUrl');
+        }
+      } catch (e) {
+        print('Error creating thumbnail: $e');
+        // Tiếp tục mà không có thumbnail
       }
 
       return videoUrl;
     } catch (e) {
       print('Error uploading video: $e');
-      rethrow;
+      throw 'Không thể tải video lên. Vui lòng kiểm tra quyền truy cập và thử lại.';
     }
   }
 

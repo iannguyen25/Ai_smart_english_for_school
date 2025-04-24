@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import '../../models/flashcard.dart';
 import '../../models/flashcard_item.dart';
 
@@ -19,19 +20,125 @@ class FlashcardPracticeScreen extends StatefulWidget {
 
 class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
   late PageController _pageController;
+  FlutterTts? _flutterTts;
+  bool _isTtsInitialized = false;
   int _currentIndex = 0;
   bool _showAnswer = false;
   List<bool> _knownCards = [];
+  bool _showingFront = true;
+  bool _isCompleted = false;
+  bool _isSpeaking = false;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
     _knownCards = List.filled(widget.items.length, false);
+    _initTts();
+  }
+
+  Future<void> _initTts() async {
+    try {
+      _flutterTts = FlutterTts();
+      
+      if (_flutterTts == null) {
+        print("TTS Init Error: FlutterTts is null");
+        return;
+      }
+
+      var languages = await _flutterTts!.getLanguages;
+      print("Available languages: $languages");
+
+      var available = await _flutterTts!.isLanguageAvailable("en-US");
+      print("Is en-US available: $available");
+      
+      if (available) {
+        await _flutterTts!.setLanguage("en-US");
+        await _flutterTts!.setSpeechRate(0.5);
+        await _flutterTts!.setVolume(1.0);
+        await _flutterTts!.setPitch(1.0);
+        
+        _flutterTts!.setCompletionHandler(() {
+          if (mounted) {
+            setState(() {
+              _isSpeaking = false;
+            });
+          }
+        });
+
+        _flutterTts!.setErrorHandler((msg) {
+          print("TTS Error Handler: $msg");
+          if (mounted) {
+            setState(() {
+              _isSpeaking = false;
+            });
+          }
+        });
+
+        setState(() {
+          _isTtsInitialized = true;
+        });
+        print("TTS initialized successfully");
+      } else {
+        print("Language en-US is not available");
+      }
+    } catch (e) {
+      print("TTS Init Error: $e");
+    }
+  }
+
+  Future<void> _speak(String text) async {
+    if (!_isTtsInitialized || _flutterTts == null) {
+      print("TTS not initialized yet");
+      return;
+    }
+
+    try {
+      if (_isSpeaking) {
+        await _flutterTts!.stop();
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _isSpeaking = true;
+        });
+      }
+      
+      var result = await _flutterTts!.speak(text);
+      print("TTS speak result: $result");
+      
+      if (result != 1) {
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("TTS Speak Error: $e");
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    if (_flutterTts != null) {
+      try {
+        _flutterTts!.stop();
+      } catch (e) {
+        print("TTS Dispose Error: $e");
+      }
+    }
     _pageController.dispose();
     super.dispose();
   }
@@ -61,14 +168,45 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
   }
 
   void _markCard(bool known) {
+    print('Current index: $_currentIndex');
+    print('Total items: ${widget.items.length}');
+    print('Is last card: ${_currentIndex >= widget.items.length - 1}');
+    
     setState(() {
       _knownCards[_currentIndex] = known;
+      
+      if (_currentIndex >= widget.items.length - 1) {
+        print('Showing completion screen');
+        _isCompleted = true;
+      } else {
+        _nextCard();
+      }
     });
-    _nextCard();
+  }
+
+  void _restartPractice() {
+    setState(() {
+      _currentIndex = 0;
+      _showAnswer = false;
+      _knownCards = List.filled(widget.items.length, false);
+      _isCompleted = false;
+    });
+    _pageController.animateToPage(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    print('Building screen, isCompleted: $_isCompleted');
+    
+    if (_isCompleted) {
+      print('Returning completion screen');
+      return _buildCompletionScreen();
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.flashcard.title),
@@ -115,6 +253,7 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
           Expanded(
             child: PageView.builder(
               controller: _pageController,
+              physics: _isCompleted ? const NeverScrollableScrollPhysics() : null,
               onPageChanged: (index) {
                 setState(() {
                   _currentIndex = index;
@@ -177,6 +316,10 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                   ElevatedButton.icon(
@@ -186,6 +329,10 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -217,25 +364,31 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              _showAnswer ? 'Câu trả lời:' : 'Câu hỏi:',
-                              style: Theme.of(context).textTheme.titleMedium,
-                              textAlign: TextAlign.center,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _showAnswer ? 'Câu trả lời:' : 'Câu hỏi:',
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                  textAlign: TextAlign.center,
+                                ),
+                                if (!item.type.toString().contains('image')) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    onPressed: () {
+                                      _speak(_showAnswer ? item.answer : item.question);
+                                    },
+                                    icon: Icon(
+                                      _isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
+                                      color: _isSpeaking ? Colors.blue : Colors.grey,
+                                    ),
+                                    tooltip: 'Nghe phát âm',
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 16),
-                            Text(
-                              _showAnswer ? item.answer : item.question,
-                              style: Theme.of(context).textTheme.headlineSmall,
-                              textAlign: TextAlign.center,
-                            ),
-                            if (item.image != null && _showAnswer) ...[
-                              const SizedBox(height: 24),
-                              Image.network(
-                                item.image!,
-                                height: 200,
-                                fit: BoxFit.cover,
-                              ),
-                            ],
+                            _buildFlashcardContent(item),
                           ],
                         ),
                       ),
@@ -278,6 +431,285 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlashcardContent(FlashcardItem item) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (!_showAnswer) ...[
+          // Hiển thị phần câu hỏi
+          if (item.type == FlashcardItemType.imageOnly || 
+              item.type == FlashcardItemType.imageToText ||
+              item.type == FlashcardItemType.imageToImage) ...[
+            if (item.questionImage != null && item.questionImage!.isNotEmpty)
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    item.questionImage!,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ] else
+            Text(
+              item.question,
+              style: Theme.of(context).textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+        ] else ...[
+          // Hiển thị phần câu trả lời
+          if (item.type == FlashcardItemType.imageOnly) ...[
+            if (item.questionImage != null && item.questionImage!.isNotEmpty)
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    item.questionImage!,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ] else if (item.type == FlashcardItemType.imageToImage) ...[
+            if (item.answerImage != null && item.answerImage!.isNotEmpty)
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    item.answerImage!,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ] else if (item.type == FlashcardItemType.textToImage) ...[
+            if (item.answerImage != null && item.answerImage!.isNotEmpty)
+              Container(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    item.answerImage!,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      );
+                    },
+                  ),
+                ),
+              ),
+          ] else
+            Text(
+              item.answer,
+              style: Theme.of(context).textTheme.headlineMedium,
+              textAlign: TextAlign.center,
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCompletionScreen() {
+    final int knownCount = _knownCards.where((known) => known).length;
+    final int unknownCount = _knownCards.where((known) => !known).length;
+    
+    return WillPopScope(
+      onWillPop: () async {
+        Get.back();
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.flashcard.title),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Get.back(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                size: 80,
+                color: Colors.green,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Hoàn thành!',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 32),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.check, color: Colors.green),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'Đã thuộc: $knownCount thẻ',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.close, color: Colors.red),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'Chưa thuộc: $unknownCount thẻ',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 48),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => Get.back(),
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Quay lại'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _restartPractice,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Luyện tập lại'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

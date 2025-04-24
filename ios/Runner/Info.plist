@@ -84,7 +84,7 @@
 	<key>NSCalendarsUsageDescription</key>
 	<string>This app requires calendars access to function properly.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Ứng dụng cần quyền truy cập camera để chụp ảnh bìa cho lớp học</string>
+	<string>Ứng dụng cần truy cập camera để chụp ảnh cho flashcard</string>
 	<key>NSContactsUsageDescription</key>
 	<string>This app requires contacts access to function properly.</string>
 	<key>NSLocalNetworkUsageDescription</key>
@@ -98,17 +98,17 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app requires location access to function properly.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app requires mic access to record video.</string>
+	<string>This application needs to access your microphone for text to speech feature</string>
 	<key>NSMotionUsageDescription</key>
 	<string>This app requires motion access</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app requires mic access to photo</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Ứng dụng cần quyền truy cập thư viện ảnh để chọn ảnh bìa cho lớp học</string>
+	<string>Ứng dụng cần truy cập thư viện ảnh để chọn ảnh cho flashcard</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>This app requires reminders access to function properly.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>This app requires mic access to record video.</string>
+	<string>This application needs the speech recognition permission for text to speech feature</string>
 	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

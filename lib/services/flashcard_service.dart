@@ -97,10 +97,10 @@ class FlashcardService {
   // Get public flashcards
   Future<List<Flashcard>> getPublicFlashcards() async {
     try {
+      // Chỉ query theo isPublic và approvalStatus
       final snapshot = await _flashcardsRef
           .where('isPublic', isEqualTo: true)
-          // Tạm thời bỏ orderBy cho đến khi index được tạo
-          //.orderBy('updatedAt', descending: true)
+          .where('approvalStatus', isEqualTo: 'approved')
           .get();
       
       final flashcards = snapshot.docs.map((doc) {
@@ -168,8 +168,11 @@ class FlashcardService {
       for (var doc in itemsSnapshot.docs) {
         final item =
             FlashcardItem.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-        if (item.image != null) {
-          await _storageService.deleteFile(item.image!);
+        if (item.questionImage != null) {
+          await _storageService.deleteFile(item.questionImage!);
+        }
+        if (item.answerImage != null) {
+          await _storageService.deleteFile(item.answerImage!);
         }
         await doc.reference.delete();
       }
@@ -247,8 +250,11 @@ class FlashcardService {
 
       final item =
           FlashcardItem.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      if (item.image != null) {
-        await _storageService.deleteFile(item.image!);
+      if (item.questionImage != null) {
+        await _storageService.deleteFile(item.questionImage!);
+      }
+      if (item.answerImage != null) {
+        await _storageService.deleteFile(item.answerImage!);
       }
 
       await doc.reference.delete();
@@ -293,6 +299,28 @@ class FlashcardService {
     } catch (e) {
       print('Error getting flashcards: $e');
       rethrow;
+    }
+  }
+
+  // Get flashcards by lesson ID
+  Future<List<Flashcard>> getLessonFlashcards(String lessonId) async {
+    try {
+      // Chỉ query theo lessonId, không dùng orderBy
+      final snapshot = await _flashcardsRef
+          .where('lessonId', isEqualTo: lessonId)
+          .get();
+      
+      final flashcards = snapshot.docs.map((doc) => 
+        Flashcard.fromMap(doc.data() as Map<String, dynamic>, doc.id)
+      ).toList();
+
+      // Sắp xếp locally
+      flashcards.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      
+      return flashcards;
+    } catch (e) {
+      print('Error getting lesson flashcards: $e');
+      throw 'Không thể tải danh sách thẻ ghi nhớ của bài học';
     }
   }
 }

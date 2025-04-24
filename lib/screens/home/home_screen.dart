@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'tabs/dashboard_tab.dart';
 import 'tabs/profile_tab.dart';
 import '../flashcards/create_edit_flashcard_screen.dart';
+import '../materials/student_materials_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -17,30 +18,53 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  // Chuyển đổi giữa selected index và actual index
-  int get _currentIndex {
-    if (_selectedIndex < 2) return _selectedIndex;
-    return _selectedIndex - 1; // Bỏ qua tab "+" ở giữa
-  }
+  int _currentIndex = 0;
 
   final List<Widget> _tabs = [
-    DashboardTab(),
-    FoldersTab(),
-    AIChatTab(),
-    ProfileTab(),
+    const DashboardTab(),
+    const FoldersTab(),
+     AIChatTab(),
+    const StudentMaterialsScreen(),
+    const ProfileTab(),
+  ];
+
+  final List<BottomNavigationBarItem> _bottomNavItems = [
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.home_outlined),
+      activeIcon: Icon(Icons.home),
+      label: 'Trang chủ',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.folder_outlined),
+      activeIcon: Icon(Icons.folder),
+      label: 'Thư mục',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.chat_outlined),
+      activeIcon: Icon(Icons.chat),
+      label: 'AI Chat',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.menu_book_outlined),
+      activeIcon: Icon(Icons.menu_book),
+      label: 'Tài liệu',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.person_outline),
+      activeIcon: Icon(Icons.person),
+      label: 'Hồ sơ',
+    ),
   ];
 
   void _onItemTapped(int index) {
-    if (index == 2) {
-      // Index của nút "+"
-      _showAddMenu();
-    } else {
+    // if (index == 2) {
+    //   // Index của nút "+"
+    //   _showAddMenu();
+    // } else {
       setState(() {
-        _selectedIndex = index;
+        _currentIndex = index;
       });
-    }
+    
   }
 
   void _showAddMenu() {
@@ -137,38 +161,10 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.white,
       body: _tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
+        currentIndex: _currentIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Trang chủ',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.folder),
-            label: 'Thư mục',
-          ),
-          BottomNavigationBarItem(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
-            label: '',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'AI Chat',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Cá nhân',
-          ),
-        ],
+        items: _bottomNavItems,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
       ),

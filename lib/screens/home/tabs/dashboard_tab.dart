@@ -1,12 +1,16 @@
 import 'package:base_flutter_framework/screens/flashcards/create_edit_flashcard_screen.dart';
 import 'package:base_flutter_framework/screens/folder/create_edit_folder_screen.dart';
+import 'package:base_flutter_framework/screens/home/tabs/ai_chat_tab.dart';
 import 'package:base_flutter_framework/screens/home/tabs/flashcards_tab.dart';
 import 'package:base_flutter_framework/screens/home/tabs/folders_tab.dart';
+import 'package:base_flutter_framework/screens/notifications/notification_history_screen.dart';
+import 'package:base_flutter_framework/screens/settings/notification_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../classroom/classroom_list_screen.dart';
 import '../../classroom/join_by_code_screen.dart';
 import '../../classroom/create_edit_classroom_screen.dart';
+import '../../translate/translate_screen.dart';
 import '../../../models/classroom.dart';
 import '../../../services/classroom_service.dart';
 import '../../../services/auth_service.dart';
@@ -62,7 +66,7 @@ class _DashboardTabState extends State<DashboardTab> {
           IconButton(
             icon: const Icon(Icons.notifications),
             onPressed: () {
-              // Navigate to notifications
+              Get.to(() => const NotificationHistoryScreen());
             },
           ),
         ],
@@ -124,20 +128,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   color: Colors.blue,
                 ),
 
-                // Tạo lớp học mới
-                _buildQuickActionCard(
-                  icon: Icons.add_circle_outline,
-                  title: 'Tạo lớp học',
-                  subtitle: 'Tạo một lớp học mới',
-                  onTap: () async {
-                    final result =
-                        await Get.to(() => const CreateEditClassroomScreen());
-                    if (result == true) {
-                      // Refresh nếu cần
-                    }
-                  },
-                  color: Colors.green,
-                ),
+                
 
                 // Tham gia lớp học
                 _buildQuickActionCard(
@@ -158,8 +149,48 @@ class _DashboardTabState extends State<DashboardTab> {
 
             const SizedBox(height: 24),
 
+            // Text(
+            //   'Flashcard',
+            //   style: Theme.of(context).textTheme.titleLarge,
+            // ),
+            // const SizedBox(height: 16),
+
+            // GridView.count(
+            //   shrinkWrap: true,
+            //   physics: const NeverScrollableScrollPhysics(),
+            //   crossAxisCount: 2,
+            //   mainAxisSpacing: 16,
+            //   crossAxisSpacing: 16,
+            //   childAspectRatio: 1.5,
+            //   children: [
+            //     _buildQuickActionCard(
+            //       icon: Icons.collections,
+            //       title: 'Danh sách flashcard',
+            //       subtitle: 'Xem tất cả flashcard của bạn',
+            //       onTap: () => Get.to(() => const FlashcardsTab()),
+            //       color: Colors.blue,
+            //     ),
+            //     _buildQuickActionCard(
+            //       icon: Icons.add_circle_outline,
+            //       title: 'Tạo flashcard',
+            //       subtitle: 'Tạo flashcard mới',
+            //       onTap: () {
+            //         Navigator.push(
+            //           context,
+            //           MaterialPageRoute(
+            //             builder: (context) => CreateEditFlashcardScreen(),
+            //           ),
+            //         );
+            //       },
+            //       color: Colors.green,
+            //     ),
+            //   ],
+            // ),
+
+            // const SizedBox(height: 24),
+
             Text(
-              'Flashcard',
+              'Tra từ điển',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -167,39 +198,25 @@ class _DashboardTabState extends State<DashboardTab> {
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
+              crossAxisCount: 1,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 1.5,
+              childAspectRatio: 3.0,
               children: [
                 _buildQuickActionCard(
-                  icon: Icons.collections,
-                  title: 'Danh sách flashcard',
-                  subtitle: 'Xem tất cả flashcard của bạn',
-                  onTap: () => Get.to(() => const FlashcardsTab()),
-                  color: Colors.blue,
-                ),
-                _buildQuickActionCard(
-                  icon: Icons.add_circle_outline,
-                  title: 'Tạo flashcard',
-                  subtitle: 'Tạo flashcard mới',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CreateEditFlashcardScreen(),
-                      ),
-                    );
-                  },
-                  color: Colors.green,
+                  icon: Icons.translate,
+                  title: 'Tra từ điển',
+                  subtitle: 'Tìm kiếm từ và thêm vào bộ thẻ ghi nhớ',
+                  onTap: () => Get.to(() => TranslateScreen()),
+                  color: Colors.purple,
                 ),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            Text(
-              'Thư mục',
+             Text(
+              'Hỏi đáp cùng AI',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -207,34 +224,58 @@ class _DashboardTabState extends State<DashboardTab> {
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
+              crossAxisCount: 1,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              childAspectRatio: 1.5,
+              childAspectRatio: 3.0,
               children: [
                 _buildQuickActionCard(
-                  icon: Icons.collections,
-                  title: 'Danh sách thư mục',
-                  subtitle: 'Xem tất cả thư mục của bạn',
-                  onTap: () => Get.to(() => const FoldersTab()),
-                  color: Colors.blue,
-                ),
-                _buildQuickActionCard(
-                  icon: Icons.add_circle_outline,
-                  title: 'Tạo folder',
-                  subtitle: 'Tạo folder mới',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CreateEditFolderScreen(),
-                      ),
-                    );
-                  },
-                  color: Colors.green,
+                  icon: Icons.translate,
+                  title: 'Hỏi đáp cùng AI',
+                  subtitle: 'Hỏi đáp cùng AI',
+                  onTap: () => Get.to(() =>  AIChatTab()),
+                  color: Colors.purple,
                 ),
               ],
             ),
+
+            // Text(
+            //   'Thư mục',
+            //   style: Theme.of(context).textTheme.titleLarge,
+            // ),
+            // const SizedBox(height: 16),
+
+            // GridView.count(
+            //   shrinkWrap: true,
+            //   physics: const NeverScrollableScrollPhysics(),
+            //   crossAxisCount: 2,
+            //   mainAxisSpacing: 16,
+            //   crossAxisSpacing: 16,
+            //   childAspectRatio: 1.5,
+            //   children: [
+            //     _buildQuickActionCard(
+            //       icon: Icons.collections,
+            //       title: 'Danh sách thư mục',
+            //       subtitle: 'Xem tất cả thư mục của bạn',
+            //       onTap: () => Get.to(() => const FoldersTab()),
+            //       color: Colors.blue,
+            //     ),
+            //     _buildQuickActionCard(
+            //       icon: Icons.add_circle_outline,
+            //       title: 'Tạo folder',
+            //       subtitle: 'Tạo folder mới',
+            //       onTap: () {
+            //         Navigator.push(
+            //           context,
+            //           MaterialPageRoute(
+            //             builder: (context) => CreateEditFolderScreen(),
+            //           ),
+            //         );
+            //       },
+            //       color: Colors.green,
+            //     ),
+            //   ],
+            // ),
           ],
         ),
       ),

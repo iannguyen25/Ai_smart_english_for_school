@@ -119,7 +119,7 @@ class _CreateEditFolderScreenState extends State<CreateEditFolderScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(widget.folder == null ? 'Tạo thư mục' : 'Lưu thay đổi'),
+                  : Text(widget.folder == null ? 'Tạo thư mục' : 'Lưu thay đổi', style: TextStyle(color: Colors.black)),
             ),
           ],
         ),
