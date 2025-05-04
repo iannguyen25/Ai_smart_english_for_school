@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/vietnamese_encoding_maps.dart';
+import 'package:diacritic/diacritic.dart';
 import '../services/unicode_utils.dart';
 
 /// Lớp xử lý văn bản cho các tính năng của ứng dụng
@@ -8,14 +8,19 @@ class TextProcessor {
   static String processOCRText(String text) {
     if (text.isEmpty) return text;
     
+    print('Original OCR text: $text');
+    
     // Bước 1: Sửa lỗi encoding tiếng Việt
-    String result = VietnameseEncodingMaps.fixVietnameseEncoding(text);
+    String result = removeDiacritics(text);
+    print('After removeDiacritics: $result');
     
     // Bước 2: Chuẩn hóa dấu câu
     result = _normalizePunctuation(result);
+    print('After normalizePunctuation: $result');
     
     // Bước 3: Loại bỏ khoảng trắng thừa
     result = _normalizeWhitespace(result);
+    print('After normalizeWhitespace: $result');
     
     return result;
   }
@@ -24,17 +29,23 @@ class TextProcessor {
   static String processDictionaryText(String text) {
     if (text.isEmpty) return text;
     
+    print('Original dictionary text: $text');
+    
     // Bước 1: Sửa lỗi encoding tiếng Việt
-    String result = VietnameseEncodingMaps.fixVietnameseEncoding(text);
+    String result = removeDiacritics(text);
+    print('After removeDiacritics: $result');
     
     // Bước 2: Chuẩn hóa dấu câu
     result = _normalizePunctuation(result);
+    print('After normalizePunctuation: $result');
     
     // Bước 3: Loại bỏ khoảng trắng thừa
     result = _normalizeWhitespace(result);
+    print('After normalizeWhitespace: $result');
     
     // Bước 4: Chuẩn hóa các ký hiệu từ điển [n], [v], etc.
     result = _normalizeDictionarySymbols(result);
+    print('After normalizeDictionarySymbols: $result');
     
     return result;
   }
@@ -128,16 +139,21 @@ class TextProcessor {
   static String formatVietnameseSentence(String sentence) {
     if (sentence.isEmpty) return sentence;
     
+    print('Original Vietnamese sentence: $sentence');
+    
     // Sửa lỗi encoding
-    String result = VietnameseEncodingMaps.fixVietnameseEncoding(sentence);
+    String result = removeDiacritics(sentence);
+    print('After removeDiacritics: $result');
     
     // Loại bỏ khoảng trắng đầu và cuối
     result = result.trim();
+    print('After trim: $result');
     
     // Viết hoa chữ cái đầu tiên
     if (result.isNotEmpty) {
       result = result[0].toUpperCase() + result.substring(1);
     }
+    print('After capitalize: $result');
     
     // Đảm bảo có dấu chấm ở cuối câu nếu cần
     if (result.isNotEmpty && 
@@ -146,6 +162,7 @@ class TextProcessor {
         !result.endsWith('?')) {
       result += '.';
     }
+    print('Final result: $result');
     
     return result;
   }

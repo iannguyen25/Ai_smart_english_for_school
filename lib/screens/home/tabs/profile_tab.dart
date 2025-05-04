@@ -1,4 +1,6 @@
 import 'package:base_flutter_framework/screens/admin/admin_dashboard_screen.dart';
+import 'package:base_flutter_framework/screens/classroom/classroom_list_screen.dart';
+import 'package:base_flutter_framework/screens/notifications/notification_history_screen.dart';
 import 'package:base_flutter_framework/screens/profile/delete_account_screen.dart';
 import 'package:base_flutter_framework/screens/profile/edit_profile_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -40,10 +42,12 @@ class _ProfileTabState extends State<ProfileTab> {
     super.initState();
     // Đảm bảo dữ liệu người dùng được tải khi tab được tạo
     _refreshUserData();
-    // Tải dữ liệu streak và badge
-    _loadUserStats();
-    // Cập nhật streak
-    _updateStreak();
+    // Chỉ tải dữ liệu streak và badge cho học sinh
+    final user = _authService.currentUser;
+    if (user != null && user.roleId == 'student') {
+      _loadUserStats();
+      _updateStreak();
+    }
     _loadUnreadNotifications();
   }
 
@@ -283,6 +287,12 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildStreakAndBadgesCard(BuildContext context) {
+    final user = _authService.currentUser;
+    // Chỉ hiển thị cho học sinh
+    if (user == null || user.roleId != 'student') {
+      return const SizedBox.shrink();
+    }
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -484,7 +494,7 @@ class _ProfileTabState extends State<ProfileTab> {
             _buildOptionTile(
               'Lớp học của tôi',
               Icons.class_,
-              () => Get.toNamed('/my_classes'),
+              () => Get.to(() => const ClassroomListScreen()),
             ),
             _buildOptionTile(
               'Huy hiệu của tôi',
@@ -494,35 +504,44 @@ class _ProfileTabState extends State<ProfileTab> {
             _buildOptionTile(
               'Thông báo',
               Icons.notifications_active,
-              () => Get.toNamed('/notifications'),
+              () => Get.to(() => const NotificationHistoryScreen()),
               badgeCount: _unreadNotificationCount,
             ),
             _buildOptionTile(
               'Lời nhắc học tập',
               Icons.alarm,
-              () => Get.toNamed('/learning_reminders'),
+              () => AlertDialog(
+                title: const Text('Chức năng đang phát triển'),
+                content: const Text('Chức năng đang phát triển'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
             ),
             _buildOptionTile(
               'Cài đặt thông báo',
               Icons.notifications,
               () => Get.to(() => const NotificationSettingsScreen()),
             ),
-            _buildOptionTile(
-              'Cài đặt ngôn ngữ',
-              Icons.language,
-              () => Get.toNamed('/language_settings'),
-            ),
+            // _buildOptionTile(
+            //   'Cài đặt ngôn ngữ',
+            //   Icons.language,
+            //   () => Get.toNamed('/language_settings'),
+            // ),
             if (_authService.isCurrentUserAdmin)
               _buildOptionTile(
                 'Dashboard',
                 Icons.dashboard,
                 () => Get.to(() => const AdminDashboardScreen()),
               ),
-            _buildOptionTile(
-              'Trợ giúp & Hỗ trợ',
-              Icons.help,
-              () => Get.toNamed('/help'),
-            ),
+              // _buildOptionTile(
+              //   'Trợ giúp & Hỗ trợ',
+              //   Icons.help,
+              //   () => Get.toNamed('/help'),
+              // ),
             // Chỉ hiển thị quản lý người dùng cho admin
             if (_authService.isCurrentUserAdmin)
               _buildOptionTile(
@@ -542,6 +561,7 @@ class _ProfileTabState extends State<ProfileTab> {
               Icons.library_books,
               () => Get.to(() => const StudentMaterialsScreen()),
             ),
+            if (_authService.isCurrentUserAdmin)
             _buildOptionTile(
               'Xóa tài khoản',
               Icons.delete_forever,

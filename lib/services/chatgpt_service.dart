@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import 'vietnamese_encoding_maps.dart';
+import 'package:diacritic/diacritic.dart';
 
 class ChatGPTService {
   final String _baseUrl = 'https://api.cohere.ai/v1/chat';
@@ -26,6 +26,12 @@ class ChatGPTService {
     try {
       final apiKey = _getApiKey();
       
+      print('Original text before processing: $text');
+      
+      // Chuẩn hóa text trước khi gửi API
+      String normalizedText = removeDiacritics(text);
+      print('After removeDiacritics: $normalizedText');
+      
       final response = await http.post(
         Uri.parse(_baseUrl),
         headers: {
@@ -34,22 +40,29 @@ class ChatGPTService {
           'accept': 'application/json',
         },
         body: jsonEncode({
-          'model': 'command-r-plus', // Cohere model
-          'message': 'Please fix any OCR text errors in this text and format it properly:\n$text',
+          'model': 'command-r-plus',
+          'message': normalizedText,
           'temperature': 0.3,
         }),
       );
 
+      print('API Response status code: ${response.statusCode}');
+      print('Raw API Response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['text'] ?? text;
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        final result = data['text'] ?? text;
+        print('Final processed text: $result');
+        return result;
       } else {
         _handleApiError(response.statusCode, response.body);
-        return text; // Return original text if API call fails
+        print('Error occurred, returning original text: $text');
+        return text;
       }
     } catch (e) {
       print('Error in Cohere processing: $e');
-      return text; // Return original text if there's an error
+      print('Error occurred, returning original text: $text');
+      return text;
     }
   }
 
@@ -65,16 +78,10 @@ class ChatGPTService {
           'accept': 'application/json',
         },
         body: jsonEncode({
-          'model': 'command-r-plus', // Cohere model
-          'message': '''Tạo thẻ học từ văn bản trang từ điển này. 
-          Đầu vào là văn bản quét OCR của một trang từ điển Anh-Việt với định dạng:
-          - Từ tiếng Anh (thường ở đầu dòng)
-          - Phiên âm (giữa các ký tự / /)
-          - Loại từ [n] (danh từ), [v] (động từ), v.v.
-          - Nghĩa/định nghĩa tiếng Việt
-          
-          Trích xuất chúng thành thẻ học với từ tiếng Anh là câu hỏi và nghĩa tiếng Việt là câu trả lời.
-          Định dạng phản hồi như một mảng JSON, trong đó mỗi mục có các trường "question" (từ tiếng Anh) và "answer" (nghĩa tiếng Việt).
+          'model': 'command-r-plus',
+          'message': '''Tạo thẻ học từ văn bản này với định nghĩa ngắn gọn nhất (tối đa 50 ký tự).
+          Chỉ lấy nghĩa chính, phổ biến nhất của từ.
+          Định dạng phản hồi là mảng JSON với các trường "question" (từ tiếng Anh) và "answer" (nghĩa tiếng Việt).
           Ví dụ: [{"question": "hello", "answer": "xin chào"}, {"question": "book", "answer": "quyển sách"}]
           
           Đây là văn bản:
@@ -268,11 +275,10 @@ class ChatGPTService {
     return flashcards;
   }
   
-  // Bước này sẽ tiếp tục sử dụng class VietnameseEncodingMaps mới
   String _fixVietnameseEncoding(String text) {
     if (text.isEmpty) return text;
     
-    // Sử dụng phương thức từ class VietnameseEncodingMaps
-    return VietnameseEncodingMaps.fixVietnameseEncoding(text);
+    // Sử dụng package diacritic để xử lý text tiếng Việt
+    return removeDiacritics(text);
   }
 }

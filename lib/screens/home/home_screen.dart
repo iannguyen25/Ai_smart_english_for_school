@@ -22,9 +22,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _tabs = [
     const DashboardTab(),
-    const FoldersTab(),
+    // const FoldersTab(),
      AIChatTab(),
-    const StudentMaterialsScreen(),
+    // const StudentMaterialsScreen(),
     const ProfileTab(),
   ];
 
@@ -34,21 +34,21 @@ class _HomeScreenState extends State<HomeScreen> {
       activeIcon: Icon(Icons.home),
       label: 'Trang chủ',
     ),
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.folder_outlined),
-      activeIcon: Icon(Icons.folder),
-      label: 'Thư mục',
-    ),
+    // const BottomNavigationBarItem(
+    //   icon: Icon(Icons.folder_outlined),
+    //   activeIcon: Icon(Icons.folder),
+    //   label: 'Thư mục',
+    // ),
     const BottomNavigationBarItem(
       icon: Icon(Icons.chat_outlined),
       activeIcon: Icon(Icons.chat),
       label: 'AI Chat',
     ),
-    const BottomNavigationBarItem(
-      icon: Icon(Icons.menu_book_outlined),
-      activeIcon: Icon(Icons.menu_book),
-      label: 'Tài liệu',
-    ),
+    // const BottomNavigationBarItem(
+    //   icon: Icon(Icons.menu_book_outlined),
+    //   activeIcon: Icon(Icons.menu_book),
+    //   label: 'Tài liệu',
+    // ),
     const BottomNavigationBarItem(
       icon: Icon(Icons.person_outline),
       activeIcon: Icon(Icons.person),

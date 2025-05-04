@@ -184,6 +184,15 @@
       ]
     },
     {
+      "collectionGroup": "learning_progress",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "lessonId", "order": "ASCENDING" },
+        { "fieldPath": "classroomId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "pending_content",
       "queryScope": "COLLECTION",
       "fields": [

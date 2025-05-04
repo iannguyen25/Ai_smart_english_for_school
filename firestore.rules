@@ -264,6 +264,19 @@ service cloud.firestore {
       );
     }
     
+    // Analytics tracking collections
+    match /user_video_tracking/{trackingId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /user_flashcard_tracking/{trackingId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /user_quiz_tracking/{trackingId} {
+      allow read, write: if isAuthenticated();
+    }
+    
     // Courses collection
     match /courses/{courseId} {
       allow read: if isAuthenticated();
@@ -290,6 +303,12 @@ service cloud.firestore {
         isOwner(resource.data.userId) ||
         (resource.data.classroomId != null && isTeacherOfClass(resource.data.classroomId))
       );
+    }
+		
+    match /flashcards/{userId}/{flashcardId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

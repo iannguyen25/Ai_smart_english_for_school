@@ -20,17 +20,21 @@ class LessonService {
   // Lấy danh sách bài học của lớp học
   Future<List<Lesson>> getLessonsByClassroom(String classroomId) async {
     try {
+      print('Getting lessons for classroom: $classroomId');
       final snapshot = await _lessonsCollection
           .where('classroomId', isEqualTo: classroomId)
           .orderBy('orderIndex', descending: false)
           .get();
 
-      return snapshot.docs
-          .map((doc) => Lesson.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-          .toList();
+      final lessons = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return Lesson.fromMap(data, doc.id);
+      }).toList();
+
+      return lessons;
     } catch (e) {
-      print('Error getting lessons: $e');
-      throw Exception('Không thể tải danh sách bài học: $e');
+      print('Error getting lessons by classroom: $e');
+      return [];
     }
   }
 

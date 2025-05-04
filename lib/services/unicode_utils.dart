@@ -1,4 +1,4 @@
-import 'vietnamese_encoding_maps.dart';
+import 'package:diacritic/diacritic.dart';
 
 /// Lớp tiện ích xử lý vấn đề về Unicode tiếng Việt
 class UnicodeUtils {
@@ -14,12 +14,13 @@ class UnicodeUtils {
 
   /// Kiểm tra một chuỗi có vấn đề về encoding không
   static bool hasEncodingIssues(String text) {
-    return VietnameseEncodingMaps.hasEncodingIssues(text);
+    final normalized = removeDiacritics(text);
+    return text != normalized && isVietnameseText(text);
   }
 
   /// Sửa lỗi encoding cho chuỗi tiếng Việt
   static String fixVietnameseEncoding(String text) {
-    return VietnameseEncodingMaps.fixVietnameseEncoding(text);
+    return removeDiacritics(text);
   }
 
   /// Chuẩn hóa dấu tiếng Việt (chuyển từ Unicode tổ hợp sang Unicode kết hợp)

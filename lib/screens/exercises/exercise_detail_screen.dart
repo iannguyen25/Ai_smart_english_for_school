@@ -9,6 +9,7 @@ import '../../models/flashcard_item.dart';
 import '../../services/exercise_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
+import '../../services/analytics_service.dart';
 import 'edit_exercise_screen.dart';
 import 'edit_question_screen.dart';
 import '../../services/flashcard_service.dart';
@@ -37,6 +38,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
   final _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
   final LessonService _lessonService = LessonService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -290,6 +292,23 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
       _timer?.cancel();
       _timer = null;
       print('Attempt submitted successfully, score: ${completedAttempt.score}');
+      
+      // Track quiz activity in analytics
+      if (_exercise != null) {
+        _analyticsService.trackQuizActivity(
+          userId: _auth.currentUser?.uid ?? '',
+          lessonId: widget.lessonId,
+          classroomId: widget.classroomId,
+          quizId: _exercise!.id ?? '',
+          quizTitle: _exercise!.title,
+          action: 'completed',
+          totalQuestions: _exercise!.questions.length,
+          answeredQuestions: _answers.length,
+          score: completedAttempt.score,
+          isCompleted: true,
+          timestamp: DateTime.now(),
+        );
+      }
       
       _showResultDialog(completedAttempt);
     } catch (e) {
@@ -1477,7 +1496,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: ElevatedButton(
-                    onPressed: _startExercise,
+                    onPressed: _startAttempt,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -1528,14 +1547,18 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
     );
   }
 
-  Future<void> _createNewAttempt() async {
-    if (_auth.currentUser == null || _exercise == null || !mounted) {
-      print('Cannot create attempt: user is null, exercise is null, or widget not mounted');
+  Future<void> _startAttempt() async {
+    if (_exercise == null || _auth.currentUser == null) {
+      print('Exercise or user is null, cannot start attempt');
       return;
     }
     
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
-      print('Creating new attempt via ExerciseService');
+      print('Creating new attempt');
       final attempt = await _exerciseService.createAttempt(
         userId: _auth.currentUser!.uid,
         exerciseId: widget.exerciseId,
@@ -1543,94 +1566,51 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
         classroomId: widget.classroomId,
       );
       
-      if (!mounted) {
-        print('Widget no longer mounted after creating attempt');
-        return;
-      }
+      if (!mounted) return;
       
-      print('New attempt created: ${attempt.id}');
       setState(() {
         _attempt = attempt;
-        _answers = {};
+        _isLoading = false;
+        _hasStarted = true;
       });
-    } catch (e) {
-      print('Error creating attempt: $e');
       
-      if (!mounted) {
-        print('Widget no longer mounted after attempt creation error');
-        return;
-      }
+      // Track starting quiz in analytics
+      _trackQuizStart();
+      
+      print('Starting timer for new attempt');
+      _startTimer();
+    } catch (e) {
+      print('Error starting attempt: $e');
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+      });
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
+        SnackBar(content: Text('Không thể bắt đầu bài tập: $e')),
       );
     }
   }
 
-  Future<void> _startExercise() async {
-    if (_exercise == null) {
-      print('Cannot start exercise: exercise is null');
-      return;
-    }
+  // Track quiz start
+  void _trackQuizStart() {
+    if (_exercise == null || _auth.currentUser == null) return;
     
-    if (_auth.currentUser == null) {
-      print('Cannot start exercise: user is not logged in');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bạn cần đăng nhập để làm bài tập')),
-        );
-      }
-      return;
-    }
-
-    try {
-      // Check remaining attempts
-      final attempts = await _exerciseService.getAttemptsByUser(
-        _auth.currentUser!.uid, 
-        widget.exerciseId,
-      );
-      
-      final completedAttempts = attempts.where(
-        (a) => a.status == AttemptStatus.completed
-      ).length;
-      
-      if (completedAttempts >= _exercise!.attemptsAllowed) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Bạn đã sử dụng hết số lần làm bài'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-
-      await _createNewAttempt();
-      
-      if (!mounted) {
-        print('Widget no longer mounted after starting exercise');
-        return;
-      }
-      
-      setState(() {
-        _hasStarted = true;
-        _currentQuestionIndex = 0;
-      });
-      
-      _startTimer();
-    } catch (e) {
-      print('Error starting exercise: $e');
-      
-      if (!mounted) {
-        print('Widget no longer mounted after exercise start error');
-        return;
-      }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
-      );
-    }
+    _analyticsService.trackQuizActivity(
+      userId: _auth.currentUser!.uid,
+      lessonId: widget.lessonId,
+      classroomId: widget.classroomId,
+      quizId: _exercise!.id ?? '',
+      quizTitle: _exercise!.title,
+      action: 'start',
+      totalQuestions: _exercise!.questions.length,
+      answeredQuestions: 0,
+      score: 0.0,
+      isCompleted: false,
+      timestamp: DateTime.now(),
+    );
   }
 
   // Future<void> _loadFlashcardItems() async {

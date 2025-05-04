@@ -14,15 +14,28 @@ class StorageService {
   Future<String> uploadFile(File file, String folder) async {
     try {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(file.path)}';
-      final ref = _storage.ref().child('$folder/$fileName');
+      final ref = _storage.ref().child(folder).child(fileName);
 
-      final uploadTask = ref.putFile(file);
-      final snapshot = await uploadTask;
+      // Set metadata to prevent caching issues
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {'timestamp': DateTime.now().toString()}
+      );
 
-      return await snapshot.ref.getDownloadURL();
+      // Upload file with metadata
+      final uploadTask = ref.putFile(file, metadata);
+      
+      // Wait for upload to complete
+      final snapshot = await uploadTask.whenComplete(() {});
+
+      // Get download URL
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      print('File uploaded successfully: $downloadUrl');
+      return downloadUrl;
     } catch (e) {
       print('Error uploading file: $e');
-      throw 'Không thể tải file lên';
+      throw Exception('Không thể tải lên ảnh: ${e.toString()}');
     }
   }
 

@@ -64,20 +64,20 @@ class _MemberListScreenState extends State<MemberListScreen> {
       );
 
       if (mounted) {
-        setState(() {
-          _members = members.whereType<User>().toList();
+      setState(() {
+        _members = members.whereType<User>().toList();
           _pendingMembers = pendingMembers.whereType<User>().toList();
-          _isLoading = false;
-        });
+        _isLoading = false;
+      });
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _errorMessage = e.toString();
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
     }
+  }
   }
 
   Future<void> _approveMember(User user) async {
@@ -134,17 +134,17 @@ class _MemberListScreenState extends State<MemberListScreen> {
       AlertDialog(
         title: const Text('Xác nhận'),
         content: Text('Bạn có chắc chắn muốn xóa ${user.firstName} ${user.lastName} khỏi lớp học không?'),
-        actions: [
-          TextButton(
+          actions: [
+            TextButton(
             onPressed: () => Get.back(result: false),
-            child: const Text('Hủy'),
-          ),
-          TextButton(
+              child: const Text('Hủy'),
+            ),
+            TextButton(
             onPressed: () => Get.back(result: true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Xóa'),
-          ),
-        ],
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Xóa'),
+            ),
+          ],
       ),
     );
 
@@ -155,7 +155,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
     try {
       await _classroomService.removeMember(_classroom.id!, user.id!);
       await _loadMembers(); // Refresh the data
-      
+
       Get.snackbar(
         'Thành công',
         'Đã xóa ${user.firstName} ${user.lastName} khỏi lớp học',
@@ -272,33 +272,33 @@ class _MemberListScreenState extends State<MemberListScreen> {
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _members.length,
-            itemBuilder: (context, index) {
-              final member = _members[index];
+      itemCount: _members.length,
+      itemBuilder: (context, index) {
+        final member = _members[index];
               final isTeacher = member.id == _classroom.teacherId;
 
-              return Card(
+        return Card(
                 margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage:
-                        member.avatar != null ? NetworkImage(member.avatar!) : null,
-                    child: member.avatar == null
-                        ? Text(member.firstName![0].toUpperCase())
-                        : null,
-                  ),
-                  title: Text('${member.firstName} ${member.lastName}'),
-                  subtitle: Text(isTeacher ? 'Giáo viên' : 'Học viên'),
-                  trailing: _isTeacher && !isTeacher
-                      ? IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          color: Colors.red,
-                          onPressed: () => _removeMember(member),
-                        )
-                      : null,
-                ),
-              );
-            },
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundImage:
+                  member.avatar != null ? NetworkImage(member.avatar!) : null,
+              child: member.avatar == null
+                  ? Text(member.firstName![0].toUpperCase())
+                  : null,
+            ),
+            title: Text('${member.firstName} ${member.lastName}'),
+            subtitle: Text(isTeacher ? 'Giáo viên' : 'Học viên'),
+            trailing: _isTeacher && !isTeacher
+                ? IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    color: Colors.red,
+                    onPressed: () => _removeMember(member),
+                  )
+                : null,
+          ),
+        );
+      },
           ),
         ],
       ),

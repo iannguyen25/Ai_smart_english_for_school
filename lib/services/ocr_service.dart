@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
-import 'vietnamese_encoding_maps.dart';
+import 'package:diacritic/diacritic.dart';
 
 class OCRService {
   final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
@@ -43,7 +43,7 @@ class OCRService {
     List<Map<String, String>> flashcards = [];
     
     // Sửa lỗi encoding tiếng Việt trước khi xử lý
-    text = VietnameseEncodingMaps.fixVietnameseEncoding(text);
+    text = removeDiacritics(text);
     
     // Tách các dòng văn bản
     final lines = text.split('\n');

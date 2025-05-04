@@ -5,6 +5,7 @@ import '../../models/flashcard.dart';
 import '../../models/flashcard_item.dart';
 import '../../services/auth_service.dart';
 import '../../services/flashcard_service.dart';
+import '../../services/analytics_service.dart';
 import 'create_edit_flashcard_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -20,6 +21,7 @@ class FlashcardDetailScreen extends StatefulWidget {
 class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
   final AuthService _authService = AuthService();
   final FlashcardService _flashcardService = FlashcardService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   bool _isLoading = true;
   String? _errorMessage;
   Flashcard? _flashcard;
@@ -27,6 +29,8 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
   bool _isOwner = false;
   bool _isTeacher = false;
   bool _hasEditPermission = false;
+  int _viewedCards = 0;
+  bool _isTracking = false;
   
   // Thêm ScrollController và biến để theo dõi trạng thái cuộn
   late ScrollController _scrollController;
@@ -44,6 +48,54 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
       ..addListener(_onScroll);
       
     _loadFlashcardData();
+  }
+  
+  // Log hoạt động flashcard
+  void _logFlashcardActivity({required String action}) {
+    if (_flashcard == null || _authService.currentUser == null) return;
+    
+    // Chỉ log khi có lessonId và classroomId
+    if (_flashcard!.lessonId == null || _flashcard!.classroomId == null) return;
+    
+    _analyticsService.trackFlashcardActivity(
+      userId: _authService.currentUser!.id ?? '',
+      lessonId: _flashcard!.lessonId ?? '',
+      classroomId: _flashcard!.classroomId ?? '',
+      flashcardId: widget.flashcardId,
+      flashcardTitle: _flashcard!.title ?? 'Untitled Flashcard',
+      action: action,
+      totalCards: _items.length,
+      viewedCards: _viewedCards,
+      timestamp: DateTime.now(),
+    );
+  }
+  
+  // Phương thức này được gọi khi xem một flashcard
+  void _trackCardView() {
+    if (!_isTracking) {
+      // Bắt đầu tracking nếu chưa bắt đầu
+      _isTracking = true;
+      _logFlashcardActivity(action: 'start_viewing');
+    }
+    
+    setState(() {
+      // Tăng số thẻ đã xem, nhưng không vượt quá tổng số thẻ
+      if (_viewedCards < _items.length) {
+        _viewedCards++;
+      }
+      
+      // Log mỗi khi người dùng đạt các mốc xem thẻ
+      if (_viewedCards == _items.length || 
+          _viewedCards == (_items.length / 2).ceil() ||
+          _viewedCards == (_items.length * 0.8).ceil()) {
+        _logFlashcardActivity(action: 'progress_update');
+      }
+      
+      // Nếu người dùng đã xem 80% thẻ, đánh dấu hoàn thành
+      if (_viewedCards >= (_items.length * 0.8).ceil()) {
+        _logFlashcardActivity(action: 'completed');
+      }
+    });
   }
   
   void _onScroll() {
@@ -74,6 +126,10 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    
+    // Ghi lại quá trình xem flashcard khi rời khỏi màn hình
+    _logFlashcardActivity(action: 'stop_viewing');
+    
     super.dispose();
   }
 
@@ -152,6 +208,12 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
         _hasEditPermission = hasEditPermission;
         _isLoading = false;
       });
+      
+      // Log bắt đầu xem flashcard
+      if (!isOwner && !isTeacher) {
+        _logFlashcardActivity(action: 'start_viewing');
+        _isTracking = true;
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Không thể tải dữ liệu: ${e.toString()}';
@@ -701,8 +763,8 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (item.type == FlashcardItemType.imageOnly && item.questionImage != null && item.questionImage!.isNotEmpty)
-                    // Hiển thị chỉ ảnh cho kiểu imageOnly
+                  if (item.type == FlashcardItemType.imageToText && item.questionImage != null && item.questionImage!.isNotEmpty) ...[
+                    // Hiển thị ảnh và chú thích cho kiểu imageToText
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.network(
@@ -711,7 +773,41 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
                         height: 200,
                         fit: BoxFit.cover,
                       ),
-                    )
+                    ),
+                    if (item.questionCaption != null && item.questionCaption!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Chú thích:',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.questionCaption!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Text(
+                      'Định nghĩa:',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.answer,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ]
                   else if (item.type == FlashcardItemType.imageToImage) ...[
                     // Hiển thị cả 2 ảnh cho kiểu imageToImage
                     if (item.questionImage != null && item.questionImage!.isNotEmpty) ...[
@@ -732,6 +828,23 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
                           fit: BoxFit.cover,
                         ),
                       ),
+                      if (item.questionCaption != null && item.questionCaption!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Chú thích:',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.questionCaption!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 16),
                     if (item.answerImage != null && item.answerImage!.isNotEmpty) ...[
@@ -752,138 +865,107 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
                           fit: BoxFit.cover,
                         ),
                       ),
+                      if (item.answerCaption != null && item.answerCaption!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Chú thích:',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.answerCaption!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ],
                   ]
                   else ...[
                     // Hiển thị các kiểu khác như cũ
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.text_fields,
-                            color: Colors.green.shade700,
-                            size: 20,
-                          ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Từ',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.question,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
+                        child: Icon(
+                          Icons.text_fields,
+                          color: Colors.green.shade700,
+                          size: 20,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.translate,
-                            color: Colors.blue.shade700,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Định nghĩa',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Từ',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.answer,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.question,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                  if (item.type != FlashcardItemType.imageOnly && 
-                      item.type != FlashcardItemType.imageToImage && 
-                      item.answerImage != null && 
-                      item.answerImage!.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.purple.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.image,
-                            color: Colors.purple.shade700,
-                            size: 20,
-                          ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Ảnh minh họa',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
+                        child: Icon(
+                          Icons.translate,
+                          color: Colors.blue.shade700,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Định nghĩa',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
                               ),
-                              const SizedBox(height: 4),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  item.answerImage!,
-                                  width: double.infinity,
-                                  height: 150,
-                                  fit: BoxFit.cover,
-                                ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.answer,
+                              style: const TextStyle(
+                                fontSize: 16,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
                   ],
                 ],
               ),

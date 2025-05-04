@@ -6,11 +6,17 @@ class UserService {
 
   Future<User?> getUserById(String userId) async {
     try {
+      print('Getting user data for ID: $userId');
       final doc = await _db.collection('users').doc(userId).get();
+      print('User document exists: ${doc.exists}');
+      
       if (!doc.exists) {
+        print('User document not found');
         return null;
       }
-      return User.fromMap(doc.data()!, doc.id);
+
+      final data = doc.data()!;
+      return User.fromMap(data, doc.id);
     } catch (e) {
       print('Error getting user: $e');
       return null;

@@ -13,12 +13,25 @@ class AnalyticsService {
   final LessonService _lessonService = LessonService();
   final UserService _userService = UserService();
   
+  // Cache for completion rates
+  final Map<String, double> _completionRateCache = {};
+  final Duration _cacheDuration = Duration(minutes: 5);
+  final Map<String, DateTime> _cacheTimestamps = {};
+  
   // ======== TEACHER ANALYTICS ========
   
   // Tính phần trăm hoàn thành bài học của lớp
   Future<double> getClassCompletionRate(String classroomId) async {
     try {
-      // Lấy danh sách học sinh trong lớp
+      // Check cache first
+      if (_completionRateCache.containsKey(classroomId)) {
+        final cacheTime = _cacheTimestamps[classroomId];
+        if (cacheTime != null && 
+            DateTime.now().difference(cacheTime) < _cacheDuration) {
+          return _completionRateCache[classroomId]!;
+        }
+      }
+
       final classroom = await _firestore.collection('classrooms').doc(classroomId).get();
       if (!classroom.exists) return 0;
       
@@ -26,32 +39,59 @@ class AnalyticsService {
       final List<dynamic> memberIds = classData['memberIds'] ?? [];
       
       if (memberIds.isEmpty) return 0;
-      
-      // Lấy danh sách bài học của lớp
       final lessons = await _lessonService.getLessonsByClassroom(classroomId);
       if (lessons.isEmpty) return 0;
       
       double totalCompletionRate = 0;
       
-      // Tính tỷ lệ hoàn thành cho mỗi học sinh
       for (String memberId in memberIds) {
         int completedLessons = 0;
         
         for (Lesson lesson in lessons) {
-          // Kiểm tra xem học sinh đã hoàn thành bài học chưa
           final progress = await _firestore
               .collection('learning_progress')
               .where('userId', isEqualTo: memberId)
               .where('lessonId', isEqualTo: lesson.id)
-              .where('completed', isEqualTo: true)
+              .where('classroomId', isEqualTo: classroomId)
               .get();
           
           if (progress.docs.isNotEmpty) {
-            completedLessons++;
+            final progressData = progress.docs.first.data();
+            
+            // Check completion based on multiple criteria
+            final status = progressData['status'] as String?;
+            final progressPercent = progressData['progressPercent'] as num?;
+            final completedItems = progressData['completedItems'] as int?;
+            final totalItems = progressData['totalItems'] as int?;
+            final completedItemIds = progressData['completedItemIds'] as Map<String, dynamic>?;
+            
+            bool isCompleted = false;
+            
+            // Check status
+            if (status == 'completed') {
+              isCompleted = true;
+            }
+            // Check progress percent
+            else if (progressPercent != null && progressPercent >= 100) {
+              isCompleted = true;
+            }
+            // Check completed items
+            else if (completedItems != null && totalItems != null && 
+                     completedItems > 0 && completedItems >= totalItems) {
+              isCompleted = true;
+            }
+            // Check completedItemIds
+            else if (completedItemIds != null && completedItemIds.isNotEmpty &&
+                     completedItemIds.values.every((v) => v == true)) {
+              isCompleted = true;
+            }
+            
+            if (isCompleted) {
+              completedLessons++;
+            }
           }
         }
         
-        // Tính tỷ lệ hoàn thành của học sinh
         final studentCompletionRate = lessons.isNotEmpty 
             ? completedLessons / lessons.length 
             : 0;
@@ -59,269 +99,215 @@ class AnalyticsService {
         totalCompletionRate += studentCompletionRate;
       }
       
-      // Tính trung bình tỷ lệ hoàn thành của cả lớp
-      return totalCompletionRate / memberIds.length;
+      final classCompletionRate = totalCompletionRate / memberIds.length;
+
+      // Update cache
+      _completionRateCache[classroomId] = classCompletionRate;
+      _cacheTimestamps[classroomId] = DateTime.now();
+
+      return classCompletionRate;
     } catch (e) {
-      print('Error getting class completion rate: $e');
       return 0;
     }
   }
   
-  // Lấy tiến độ học tập của từng học sinh trong lớp
-  Future<List<Map<String, dynamic>>> getStudentProgressInClass(String classroomId) async {
+  // Lấy tiến độ học tập của học sinh trong lớp
+  Future<Map<String, dynamic>> getStudentProgressInClass(String classroomId, String studentId) async {
     try {
-      // Lấy danh sách học sinh trong lớp
-      final classroom = await _firestore.collection('classrooms').doc(classroomId).get();
-      if (!classroom.exists) return [];
-      
-      final classData = classroom.data() as Map<String, dynamic>;
-      final List<dynamic> memberIds = classData['memberIds'] ?? [];
-      
-      if (memberIds.isEmpty) return [];
-      
-      // Lấy danh sách bài học của lớp
       final lessons = await _lessonService.getLessonsByClassroom(classroomId);
-      if (lessons.isEmpty) return [];
       
-      List<Map<String, dynamic>> studentsProgress = [];
+      if (lessons.isEmpty) {
+        return {
+          'id': studentId,
+          'name': 'Unknown',
+          'progress': 0.0,
+          'totalLessons': 0,
+          'completedLessons': 0,
+          'lastAccessed': null
+        };
+      }
+
+      int completedLessons = 0;
+      DateTime? lastAccessed;
       
-      // Lấy thông tin tiến độ cho mỗi học sinh
-      for (String memberId in memberIds) {
-        final user = await _userService.getUserById(memberId);
-        if (user == null) continue;
+      for (Lesson lesson in lessons) {
+        final progress = await _firestore
+            .collection('learning_progress')
+            .where('userId', isEqualTo: studentId)
+            .where('lessonId', isEqualTo: lesson.id)
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
         
-        List<Map<String, dynamic>> lessonStatus = [];
-        int completedLessons = 0;
-        
-        // Kiểm tra trạng thái từng bài học
-        for (Lesson lesson in lessons) {
-          final progress = await _firestore
-              .collection('learning_progress')
-              .where('userId', isEqualTo: memberId)
-              .where('lessonId', isEqualTo: lesson.id)
-              .get();
+        if (progress.docs.isNotEmpty) {
+          final progressData = progress.docs.first.data();
+          
+          // Check completion based on multiple criteria
+          final status = progressData['status'] as String?;
+          final progressPercent = progressData['progressPercent'] as num?;
+          final completedItems = progressData['completedItems'] as int?;
+          final totalItems = progressData['totalItems'] as int?;
+          final completedItemIds = progressData['completedItemIds'] as Map<String, dynamic>?;
           
           bool isCompleted = false;
-          int minutesSpent = 0;
           
-          if (progress.docs.isNotEmpty) {
-            final progressData = progress.docs.first.data();
-            isCompleted = progressData['completed'] ?? false;
-            minutesSpent = progressData['minutesSpent'] ?? 0;
-            
-            if (isCompleted) {
-              completedLessons++;
-            }
+          // Check status
+          if (status == 'completed') {
+            isCompleted = true;
+          }
+          // Check progress percent
+          else if (progressPercent != null && progressPercent >= 100) {
+            isCompleted = true;
+          }
+          // Check completed items
+          else if (completedItems != null && totalItems != null && 
+                   completedItems > 0 && completedItems >= totalItems) {
+            isCompleted = true;
+          }
+          // Check completedItemIds
+          else if (completedItemIds != null && completedItemIds.isNotEmpty &&
+                   completedItemIds.values.every((v) => v == true)) {
+            isCompleted = true;
           }
           
-          lessonStatus.add({
-            'lessonId': lesson.id,
-            'lessonTitle': lesson.title,
-            'isCompleted': isCompleted,
-            'minutesSpent': minutesSpent,
-          });
+          if (isCompleted) {
+            completedLessons++;
+          }
+
+          // Update lastAccessed if this entry is more recent
+          if (progressData['lastAccessTime'] != null) {
+            final progressLastAccessed = (progressData['lastAccessTime'] as Timestamp).toDate();
+            if (lastAccessed == null || progressLastAccessed.isAfter(lastAccessed)) {
+              lastAccessed = progressLastAccessed;
+            }
+          }
         }
-        
-        // Tính tỷ lệ hoàn thành
-        final completionRate = lessons.isNotEmpty 
-            ? completedLessons / lessons.length 
-            : 0;
-        
-        studentsProgress.add({
-          'userId': memberId,
-          'name': user.fullName,
-          'email': user.email,
-          'photoUrl': user.avatar,
-          'completedLessons': completedLessons,
-          'totalLessons': lessons.length,
-          'completionRate': completionRate,
-          'lessonStatus': lessonStatus,
-        });
       }
       
-      // Sắp xếp theo tỷ lệ hoàn thành giảm dần
-      studentsProgress.sort((a, b) => 
-          (b['completionRate'] as double).compareTo(a['completionRate'] as double));
+      final completionRate = lessons.isNotEmpty ? completedLessons / lessons.length : 0.0;
       
-      return studentsProgress;
+      // Get user info
+      final user = await _userService.getUserById(studentId);
+      
+      return {
+        'id': studentId,
+        'name': user?.fullName ?? 'Unknown',
+        'progress': completionRate,
+        'totalLessons': lessons.length,
+        'completedLessons': completedLessons,
+        'lastAccessed': lastAccessed
+      };
     } catch (e) {
-      print('Error getting student progress: $e');
-      return [];
+      return {
+        'id': studentId,
+        'name': 'Error',
+        'progress': 0.0,
+        'totalLessons': 0,
+        'completedLessons': 0,
+        'lastAccessed': null
+      };
     }
   }
   
   // Lấy thống kê bài kiểm tra của lớp
-  Future<Map<String, dynamic>> getClassTestStatistics(String classroomId) async {
+  Future<Map<String, dynamic>?> getClassTestStatistics(String classroomId) async {
     try {
-      // Lấy danh sách học sinh trong lớp
-      final classroom = await _firestore.collection('classrooms').doc(classroomId).get();
-      if (!classroom.exists) return {};
-      
-      final classData = classroom.data() as Map<String, dynamic>;
-      final List<dynamic> memberIds = classData['memberIds'] ?? [];
-      
-      if (memberIds.isEmpty) return {};
-      
-      // Lấy danh sách bài học của lớp
-      final lessons = await _lessonService.getLessonsByClassroom(classroomId);
-      if (lessons.isEmpty) return {};
-      
-      // Thống kê cho từng bài học
-      List<Map<String, dynamic>> lessonStats = [];
-      
-      for (Lesson lesson in lessons) {
-        // Lấy danh sách bài kiểm tra của bài học
-        final quizzes = await _firestore
-            .collection('quizzes')
-            .where('lessonId', isEqualTo: lesson.id)
-            .get();
-        
-        for (var quiz in quizzes.docs) {
-          final quizId = quiz.id;
-          final quizData = quiz.data();
-          final quizTitle = quizData['title'] ?? 'Bài kiểm tra';
-          
-          // Đếm số học sinh đã làm bài kiểm tra
-          int studentsSubmitted = 0;
-          double totalScore = 0;
-          
-          // Kiểm tra từng học sinh
-          for (String memberId in memberIds) {
-            final attempts = await _firestore
-                .collection('quiz_attempts')
-                .where('userId', isEqualTo: memberId)
-                .where('quizId', isEqualTo: quizId)
-                .where('status', isEqualTo: 'completed')
-                .orderBy('createdAt', descending: true)
-                .limit(1)
-                .get();
-            
-            if (attempts.docs.isNotEmpty) {
-              studentsSubmitted++;
-              totalScore += attempts.docs.first.data()['score'] ?? 0;
-            }
-          }
-          
-          // Tính điểm trung bình
-          final averageScore = studentsSubmitted > 0 
-              ? totalScore / studentsSubmitted 
-              : 0;
-          
-          lessonStats.add({
-            'lessonId': lesson.id,
-            'lessonTitle': lesson.title,
-            'quizId': quizId,
-            'quizTitle': quizTitle,
-            'studentsSubmitted': studentsSubmitted,
-            'totalStudents': memberIds.length,
-            'submissionRate': memberIds.isNotEmpty 
-                ? studentsSubmitted / memberIds.length 
-                : 0,
-            'averageScore': averageScore,
-          });
-        }
+      // Get classroom data
+      final classroomDoc = await _firestore.collection('classrooms').doc(classroomId).get();
+      if (!classroomDoc.exists) {
+        return null;
       }
       
-      // Tìm học sinh nổi bật và học sinh yếu
-      List<Map<String, dynamic>> outstandingStudents = [];
-      List<Map<String, dynamic>> strugglingStudents = [];
+      // Get approved lessons
+      final lessonsQuery = await _firestore.collection('lessons')
+          .where('approved', isEqualTo: true)
+          .get();
       
-      for (String memberId in memberIds) {
-        final user = await _userService.getUserById(memberId);
-        if (user == null) continue;
+      final lessons = lessonsQuery.docs.map((doc) => {
+        'id': doc.id,
+        'title': doc.data()['title'] ?? 'Bài học',
+        'quizId': doc.data()['quizId'],
+      }).toList();
+      
+      // Get all members of the classroom
+      final memberIds = List<String>.from(classroomDoc.data()?['memberIds'] ?? []);
+      
+      // Calculate stats for each lesson
+      final lessonStats = <Map<String, dynamic>>[];
+      
+      for (final lesson in lessons) {
+        int completedCount = 0;
+        int attemptedCount = 0;
+        double totalScore = 0;
+        int quizAttempts = 0;
+        final String lessonId = lesson['id'];
         
-        int completedLessons = 0;
-        double totalTestScore = 0;
-        int totalTests = 0;
-        
-        // Kiểm tra tiến độ bài học
-        for (Lesson lesson in lessons) {
-          final progress = await _firestore
+        for (final memberId in memberIds) {
+          // Check if student has learning progress for this lesson
+          final progressQuery = await _firestore
+              .collection('users')
+              .doc(memberId)
               .collection('learning_progress')
-              .where('userId', isEqualTo: memberId)
-              .where('lessonId', isEqualTo: lesson.id)
-              .where('completed', isEqualTo: true)
+              .where('lessonId', isEqualTo: lessonId)
+              .where('classroomId', isEqualTo: classroomId)
               .get();
-          
-          if (progress.docs.isNotEmpty) {
-            completedLessons++;
+              
+          // Consider a lesson completed if there's a progress document
+          if (progressQuery.docs.isNotEmpty) {
+            final progressData = progressQuery.docs.first.data();
+            // Mark as completed if progress is >= 0.8 (80%)
+            if ((progressData['progress'] ?? 0.0) >= 0.8) {
+              completedCount++;
+            }
+            // Mark as attempted if they have any progress at all
+            if ((progressData['progress'] ?? 0.0) > 0.0) {
+              attemptedCount++;
+            }
           }
           
-          // Kiểm tra điểm bài kiểm tra
-          final quizzes = await _firestore
-              .collection('quizzes')
-              .where('lessonId', isEqualTo: lesson.id)
-              .get();
-          
-          for (var quiz in quizzes.docs) {
-            final attempts = await _firestore
-                .collection('quiz_attempts')
-                .where('userId', isEqualTo: memberId)
-                .where('quizId', isEqualTo: quiz.id)
-                .where('status', isEqualTo: 'completed')
-                .orderBy('createdAt', descending: true)
-                .limit(1)
+          // Check quiz scores if there's a quiz for this lesson
+          if (lesson['quizId'] != null) {
+            final quizResultsQuery = await _firestore
+                .collection('users')
+                .doc(memberId)
+                .collection('quiz_results')
+                .where('quizId', isEqualTo: lesson['quizId'])
+                .where('classroomId', isEqualTo: classroomId)
                 .get();
-            
-            if (attempts.docs.isNotEmpty) {
-              totalTests++;
-              totalTestScore += attempts.docs.first.data()['score'] ?? 0;
+                
+            if (quizResultsQuery.docs.isNotEmpty) {
+              quizAttempts += quizResultsQuery.docs.length;
+              for (final quizDoc in quizResultsQuery.docs) {
+                final score = quizDoc.data()['score'] ?? 0.0;
+                totalScore += score;
+              }
             }
           }
         }
         
-        // Tính điểm trung bình
-        final averageScore = totalTests > 0 
-            ? totalTestScore / totalTests 
-            : 0;
+        final completionRate = memberIds.isEmpty ? 0.0 : completedCount / memberIds.length;
+        final attemptRate = memberIds.isEmpty ? 0.0 : attemptedCount / memberIds.length;
+        final averageScore = quizAttempts > 0 ? totalScore / quizAttempts : 0.0;
         
-        // Tính tỷ lệ hoàn thành
-        final completionRate = lessons.isNotEmpty 
-            ? completedLessons / lessons.length 
-            : 0;
-        
-        // Xác định học sinh nổi bật (điểm cao và hoàn thành nhiều)
-        if (averageScore >= 8.0 && completionRate >= 0.7) {
-          outstandingStudents.add({
-            'userId': memberId,
-            'name': user.fullName,
-            'email': user.email,
-            'photoUrl': user.avatar,
-            'completionRate': completionRate,
-            'averageScore': averageScore,
-          });
-        }
-        
-        // Xác định học sinh yếu (điểm thấp hoặc hoàn thành ít)
-        if (averageScore < 5.0 || completionRate < 0.3) {
-          strugglingStudents.add({
-            'userId': memberId,
-            'name': user.fullName,
-            'email': user.email,
-            'photoUrl': user.avatar,
-            'completionRate': completionRate,
-            'averageScore': averageScore,
-            'reason': averageScore < 5.0 ? 'Điểm thấp' : 'Tiến độ chậm',
-          });
-        }
+        lessonStats.add({
+          'lessonId': lessonId,
+          'lessonTitle': lesson['title'],
+          'name': lesson['title'],
+          'completionRate': completionRate,
+          'attemptRate': attemptRate,
+          'completedCount': completedCount,
+          'attemptedCount': attemptedCount,
+          'totalStudents': memberIds.length,
+          'averageScore': averageScore,
+          'quizAttempts': quizAttempts,
+        });
       }
-      
-      // Sắp xếp học sinh nổi bật theo điểm trung bình giảm dần
-      outstandingStudents.sort((a, b) => 
-          (b['averageScore'] as double).compareTo(a['averageScore'] as double));
-      
-      // Sắp xếp học sinh yếu theo điểm trung bình tăng dần
-      strugglingStudents.sort((a, b) => 
-          (a['averageScore'] as double).compareTo(b['averageScore'] as double));
       
       return {
         'lessonStats': lessonStats,
-        'outstandingStudents': outstandingStudents.take(5).toList(), // Top 5
-        'strugglingStudents': strugglingStudents.take(5).toList(), // Top 5 cần hỗ trợ
       };
-    } catch (e) {
-      print('Error getting class test statistics: $e');
-      return {};
+      
+    } catch (error) {
+      return null;
     }
   }
   
@@ -344,6 +330,7 @@ class AnalyticsService {
             .collection('learning_progress')
             .where('userId', isEqualTo: studentId)
             .where('lessonId', isEqualTo: lesson.id)
+            .where('classroomId', isEqualTo: classroomId)
             .get();
         
         bool isCompleted = false;
@@ -352,10 +339,36 @@ class AnalyticsService {
         
         if (progress.docs.isNotEmpty) {
           final progressData = progress.docs.first.data();
-          isCompleted = progressData['completed'] ?? false;
-          minutesSpent = progressData['minutesSpent'] ?? 0;
-          lastAccessed = progressData['updatedAt'] != null 
-              ? (progressData['updatedAt'] as Timestamp).toDate() 
+          
+          // Check completion based on multiple criteria
+          final status = progressData['status'] as String?;
+          final progressPercent = progressData['progressPercent'] as num?;
+          final completedItems = progressData['completedItems'] as int?;
+          final totalItems = progressData['totalItems'] as int?;
+          final completedItemIds = progressData['completedItemIds'] as Map<String, dynamic>?;
+          
+          // Check status
+          if (status == 'completed') {
+            isCompleted = true;
+          }
+          // Check progress percent
+          else if (progressPercent != null && progressPercent >= 100) {
+            isCompleted = true;
+          }
+          // Check completed items
+          else if (completedItems != null && totalItems != null && 
+                  completedItems > 0 && completedItems >= totalItems) {
+            isCompleted = true;
+          }
+          // Check completedItemIds
+          else if (completedItemIds != null && completedItemIds.isNotEmpty &&
+                  completedItemIds.values.every((v) => v == true)) {
+            isCompleted = true;
+          }
+          
+          minutesSpent = progressData['timeSpentMinutes'] ?? 0;
+          lastAccessed = progressData['lastAccessTime'] != null 
+              ? (progressData['lastAccessTime'] as Timestamp).toDate() 
               : null;
           
           if (isCompleted) {
@@ -491,7 +504,6 @@ class AnalyticsService {
         },
       };
     } catch (e) {
-      print('Error getting student detailed progress: $e');
       return {};
     }
   }
@@ -611,7 +623,6 @@ class AnalyticsService {
         'topActiveClassrooms': topClassrooms,
       };
     } catch (e) {
-      print('Error getting system overview: $e');
       throw e.toString();
     }
   }
@@ -746,8 +757,7 @@ class AnalyticsService {
         'periodDays': days,
       };
     } catch (e) {
-      print('Error getting learning resources report: $e');
-      return {};
+      throw e.toString();
     }
   }
 
@@ -803,7 +813,6 @@ class AnalyticsService {
         'read': false,
       });
     } catch (e) {
-      print('Error approving content: $e');
       throw e.toString();
     }
   }
@@ -858,8 +867,243 @@ class AnalyticsService {
         'read': false,
       });
     } catch (e) {
-      print('Error rejecting content: $e');
       throw e.toString();
+    }
+  }
+  
+  // ======== VIDEO TRACKING ========
+  
+  // Track video activity
+  Future<void> trackVideoActivity({
+    required String userId,
+    required String lessonId,
+    required String classroomId,
+    required String videoId,
+    required String videoTitle,
+    required String action,
+    required bool isCompleted,
+    required double watchedPercentage,
+    required DateTime timestamp,
+  }) async {
+    try {
+      // Lưu vào collection user_video_tracking
+      await _firestore.collection('user_video_tracking').add({
+        'userId': userId,
+        'lessonId': lessonId,
+        'classroomId': classroomId,
+        'videoId': videoId,
+        'videoTitle': videoTitle,
+        'action': action,
+        'isCompleted': isCompleted,
+        'watchedPercentage': watchedPercentage,
+        'timestamp': Timestamp.fromDate(timestamp),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Nếu video hoàn thành (xem hơn 80%), cập nhật learning_progress
+      if (isCompleted) {
+        final progressQuery = await _firestore
+            .collection('learning_progress')
+            .where('userId', isEqualTo: userId)
+            .where('lessonId', isEqualTo: lessonId)
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
+            
+        if (progressQuery.docs.isNotEmpty) {
+          final progressId = progressQuery.docs.first.id;
+          final progressData = progressQuery.docs.first.data();
+          
+          // Lấy completedItemIds hoặc tạo mới nếu chưa có
+          Map<String, dynamic> completedItemIds = 
+            (progressData['completedItemIds'] as Map<String, dynamic>?) ?? {};
+          
+          // Đánh dấu video đã xem
+          completedItemIds['video'] = true;
+          
+          // Tính lại phần trăm hoàn thành
+          int completedItems = completedItemIds.values.where((value) => value == true).length;
+          int totalItems = completedItemIds.length;
+          double progressPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+          
+          // Cập nhật tiến độ học tập
+          await _firestore.collection('learning_progress').doc(progressId).update({
+            'completedItemIds': completedItemIds,
+            'completedItems': completedItems,
+            'progressPercent': progressPercent,
+            'lastAccessTime': Timestamp.fromDate(timestamp),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (e) {
+      print('Error tracking video activity: $e');
+    }
+  }
+  
+  // ======== FLASHCARD TRACKING ========
+  
+  // Track flashcard activity
+  Future<void> trackFlashcardActivity({
+    required String userId,
+    required String lessonId,
+    required String classroomId,
+    required String flashcardId,
+    required String flashcardTitle,
+    required String action,
+    required int totalCards,
+    required int viewedCards,
+    required DateTime timestamp,
+  }) async {
+    try {
+      // Calculate viewed percentage
+      final viewedPercentage = totalCards > 0 ? viewedCards / totalCards : 0.0;
+      final isCompleted = viewedPercentage >= 0.8; // Đánh dấu hoàn thành khi xem >= 80% thẻ
+      
+      // Lưu vào collection user_flashcard_tracking
+      await _firestore.collection('user_flashcard_tracking').add({
+        'userId': userId,
+        'lessonId': lessonId,
+        'classroomId': classroomId,
+        'flashcardId': flashcardId,
+        'flashcardTitle': flashcardTitle,
+        'action': action,
+        'totalCards': totalCards,
+        'viewedCards': viewedCards,
+        'viewedPercentage': viewedPercentage,
+        'isCompleted': isCompleted,
+        'timestamp': Timestamp.fromDate(timestamp),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Nếu flashcard hoàn thành (xem hơn 80%), cập nhật learning_progress
+      if (isCompleted) {
+        final progressQuery = await _firestore
+            .collection('learning_progress')
+            .where('userId', isEqualTo: userId)
+            .where('lessonId', isEqualTo: lessonId)
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
+            
+        if (progressQuery.docs.isNotEmpty) {
+          final progressId = progressQuery.docs.first.id;
+          final progressData = progressQuery.docs.first.data();
+          
+          // Lấy completedItemIds hoặc tạo mới nếu chưa có
+          Map<String, dynamic> completedItemIds = 
+            (progressData['completedItemIds'] as Map<String, dynamic>?) ?? {};
+          
+          // Đánh dấu flashcard đã xem
+          completedItemIds['flashcards'] = true;
+          
+          // Tính lại phần trăm hoàn thành
+          int completedItems = completedItemIds.values.where((value) => value == true).length;
+          int totalItems = completedItemIds.length;
+          double progressPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+          
+          // Cập nhật tiến độ học tập
+          await _firestore.collection('learning_progress').doc(progressId).update({
+            'completedItemIds': completedItemIds,
+            'completedItems': completedItems,
+            'progressPercent': progressPercent,
+            'lastAccessTime': Timestamp.fromDate(timestamp),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } catch (e) {
+      print('Error tracking flashcard activity: $e');
+    }
+  }
+  
+  // ======== QUIZ/EXERCISE TRACKING ========
+  
+  // Track quiz activity
+  Future<void> trackQuizActivity({
+    required String userId,
+    required String lessonId,
+    required String classroomId,
+    required String quizId,
+    required String quizTitle,
+    required String action,
+    required int totalQuestions,
+    required int answeredQuestions,
+    required double score,
+    required bool isCompleted,
+    required DateTime timestamp,
+  }) async {
+    try {
+      // Calculate progress percentage
+      final progressPercentage = totalQuestions > 0 ? answeredQuestions / totalQuestions : 0.0;
+      
+      // Lưu vào collection user_quiz_tracking
+      await _firestore.collection('user_quiz_tracking').add({
+        'userId': userId,
+        'lessonId': lessonId,
+        'classroomId': classroomId,
+        'quizId': quizId, 
+        'quizTitle': quizTitle,
+        'action': action,
+        'totalQuestions': totalQuestions,
+        'answeredQuestions': answeredQuestions,
+        'progressPercentage': progressPercentage,
+        'score': score,
+        'isCompleted': isCompleted,
+        'timestamp': Timestamp.fromDate(timestamp),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Nếu quiz đã hoàn thành, cập nhật learning_progress
+      if (isCompleted) {
+        final progressQuery = await _firestore
+            .collection('learning_progress')
+            .where('userId', isEqualTo: userId)
+            .where('lessonId', isEqualTo: lessonId)
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
+            
+        if (progressQuery.docs.isNotEmpty) {
+          final progressId = progressQuery.docs.first.id;
+          final progressData = progressQuery.docs.first.data();
+          
+          // Lấy completedItemIds hoặc tạo mới nếu chưa có
+          Map<String, dynamic> completedItemIds = 
+            (progressData['completedItemIds'] as Map<String, dynamic>?) ?? {};
+          
+          // Đánh dấu quiz đã hoàn thành
+          completedItemIds['exercises'] = true;
+          
+          // Tính lại phần trăm hoàn thành
+          int completedItems = completedItemIds.values.where((value) => value == true).length;
+          int totalItems = completedItemIds.length;
+          double progressPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+          
+          // Cập nhật tiến độ học tập
+          await _firestore.collection('learning_progress').doc(progressId).update({
+            'completedItemIds': completedItemIds,
+            'completedItems': completedItems,
+            'progressPercent': progressPercent,
+            'lastAccessTime': Timestamp.fromDate(timestamp),
+            'lastScore': score,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          
+          // Lưu kết quả bài kiểm tra
+          await _firestore.collection('quiz_attempts').add({
+            'userId': userId,
+            'lessonId': lessonId,
+            'classroomId': classroomId,
+            'quizId': quizId,
+            'score': score,
+            'totalQuestions': totalQuestions,
+            'answeredQuestions': answeredQuestions,
+            'createdAt': Timestamp.fromDate(timestamp),
+            'status': 'completed',
+            'passed': score >= 0.7, // Đạt nếu điểm trên 70%
+          });
+        }
+      }
+    } catch (e) {
+      print('Error tracking quiz activity: $e');
     }
   }
 } 

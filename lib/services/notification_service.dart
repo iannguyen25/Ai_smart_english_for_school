@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -11,6 +12,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../models/notification_item.dart';
 import 'package:get/get.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -18,12 +23,19 @@ class NotificationService {
   NotificationService._internal();
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = 
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
+  // Notification channels
+  static const String ADMIN_APPROVAL_CHANNEL = 'admin_approval_channel';
+  static const String NEW_LESSON_CHANNEL = 'new_lesson_channel';
+  
+  // Notification topics
+  static const String ADMIN_TOPIC = 'admin_notifications';
+  static const String NEW_LESSON_TOPIC = 'new_lesson_notifications';
+
   // Define notification channels
   static const String _classApprovalChannel = 'class_approval';
-  static const String _newLessonChannel = 'new_lesson';
   static const String _newTestChannel = 'new_test';
   static const String _newCommentChannel = 'new_comment';
   static const String _teacherResponseChannel = 'teacher_response';
@@ -33,7 +45,6 @@ class NotificationService {
   // Topic mapping for Firebase subscriptions
   static const Map<String, String> _notificationTopics = {
     _classApprovalChannel: 'class_approvals',
-    _newLessonChannel: 'new_lessons',
     _newTestChannel: 'new_tests',
     _newCommentChannel: 'new_comments',
     _teacherResponseChannel: 'teacher_responses',
@@ -43,308 +54,217 @@ class NotificationService {
 
   // Add these new properties
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
   
   // Initialize notification services
   Future<void> initialize() async {
-    // Request permission
-    await _requestPermission();
-    
-    // Initialize local notifications
-    await _initializeLocalNotifications();
-    
-    // Set up foreground notification handling
-    await _setupForegroundNotification();
-    
-    // Set up background & terminated notification handling
-    await _setupBackgroundNotification();
-    
-    // Retrieve and sync user notification preferences
-    await syncNotificationSettings();
-    
-    // Get FCM token for this device and update in Firestore
-    String? token = await _firebaseMessaging.getToken();
-    if (token != null) {
-      await updateFcmToken(token);
-    }
-    
-    // Listen for token refreshes
-    _firebaseMessaging.onTokenRefresh.listen((newToken) {
-      updateFcmToken(newToken);
-    });
-    
-    debugPrint('FCM Token: $token');
-  }
-  
-  // Request permission to receive notifications
-  Future<void> _requestPermission() async {
-    NotificationSettings settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-    
-    debugPrint('User granted permission: ${settings.authorizationStatus}');
-  }
-  
-  // Initialize local notification plugin
-  Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-        
-    final DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
-          onDidReceiveLocalNotification: (id, title, body, payload) async {
-            // iOS specific notification callback
-          },
-        );
-        
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
-    
-    await _flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse details) {
-        // Handle notification taps
-        _handleNotificationTap(details.payload);
-      },
-    );
-    
-    // Create Android notification channels
-    if (Platform.isAndroid) {
-      await _createAndroidNotificationChannels();
-    }
-  }
-  
-  // Create notification channels for Android
-  Future<void> _createAndroidNotificationChannels() async {
-    // Class approval channel
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          _classApprovalChannel,
-          'Duyệt lớp',
-          description: 'Thông báo khi bạn được duyệt vào lớp học',
-          importance: Importance.high,
-        ));
-        
-    // New lesson channel
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          _newLessonChannel,
-          'Bài học mới',
-          description: 'Thông báo khi có bài học mới được thêm vào lớp',
-          importance: Importance.high,
-        ));
-        
-    // New test channel
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          _newTestChannel,
-          'Bài kiểm tra mới',
-          description: 'Thông báo khi có bài kiểm tra mới',
-          importance: Importance.high,
-        ));
-        
-    // New comment channel
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          _newCommentChannel,
-          'Bình luận mới',
-          description: 'Thông báo khi có bình luận mới',
-          importance: Importance.defaultImportance,
-        ));
-        
-    // Teacher response channel
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          _teacherResponseChannel,
-          'Phản hồi từ giáo viên',
-          description: 'Thông báo khi giáo viên phản hồi thắc mắc của bạn',
-          importance: Importance.high,
-        ));
-        
-    // Badge award channel
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          _badgeAwardChannel,
-          'Huy hiệu mới',
-          description: 'Thông báo khi bạn nhận được huy hiệu mới',
-          importance: Importance.high,
-        ));
-        
-    // Daily reminder channel
-    await _flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
-          _dailyReminderChannel,
-          'Nhắc nhở học tập',
-          description: 'Nhắc nhở học tập hằng ngày',
-          importance: Importance.defaultImportance,
-        ));
-  }
-  
-  // Handle foreground messages
-  Future<void> _setupForegroundNotification() async {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('Got a message whilst in the foreground!');
-      debugPrint('Message data: ${message.data}');
-
-      if (message.notification != null) {
-        debugPrint('Message also contained a notification: ${message.notification}');
-        _showLocalNotification(message);
-      }
-    });
-  }
-  
-  // Handle background and terminated app messages
-  Future<void> _setupBackgroundNotification() async {
-    // Handle message when app is in background
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('onMessageOpenedApp: ${message.data}');
-      // Save to history
-      saveNotificationToHistory(message);
-      _handleNotificationTap(jsonEncode(message.data));
-    });
-    
-    // Check if app was opened from a notification when terminated
-    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    if (initialMessage != null) {
-      debugPrint('App started by notification: ${initialMessage.data}');
-      // Save to history
-      saveNotificationToHistory(initialMessage);
-      _handleNotificationTap(jsonEncode(initialMessage.data));
-    }
-    
-    // Process any pending notifications saved from background state
-    await _processPendingNotifications();
-  }
-  
-  // Show a local notification based on FCM message
-  Future<void> _showLocalNotification(RemoteMessage message) async {
-    RemoteNotification? notification = message.notification;
-    AndroidNotification? android = message.notification?.android;
-    
-    // Extract notification data
-    final String title = notification?.title ?? 'Thông báo mới';
-    final String body = notification?.body ?? '';
-    final String channelId = message.data['channel_id'] as String? ?? _dailyReminderChannel;
-    
-    if (notification != null) {
-      // Save to notification history
-      await saveNotificationToHistory(message);
+    try {
+      // Initialize timezone
+      tz.initializeTimeZones();
       
-      await _flutterLocalNotificationsPlugin.show(
-        notification.hashCode,
+      // Request permission
+      final settings = await _firebaseMessaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      print('Notification permission status: ${settings.authorizationStatus}');
+      
+      // Get and save FCM token
+      String? token = await _firebaseMessaging.getToken();
+      print('FCM Token: $token');
+      
+      if (token != null) {
+        final user = _auth.currentUser;
+        if (user != null) {
+          await _firestore.collection('users').doc(user.uid).update({
+            'fcmToken': token,
+          });
+          print('FCM token saved to user document');
+        }
+      }
+
+      // Listen for token refresh
+      _firebaseMessaging.onTokenRefresh.listen((newToken) async {
+        print('FCM token refreshed: $newToken');
+        final user = _auth.currentUser;
+        if (user != null) {
+          await _firestore.collection('users').doc(user.uid).update({
+            'fcmToken': newToken,
+          });
+          print('New FCM token saved to user document');
+        }
+      });
+
+      // Initialize local notifications
+      final initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      final initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+      );
+      
+      await _localNotifications.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          print('Notification clicked: ${response.payload}');
+        },
+      );
+      print('Local notifications initialized');
+      
+      // Create notification channels
+      await _createNotificationChannel(
+        id: ADMIN_APPROVAL_CHANNEL,
+        name: 'Admin Approval Notifications',
+        description: 'Notifications for admin approval requests',
+      );
+      print('Admin approval channel created');
+
+      await _createNotificationChannel(
+        id: NEW_LESSON_CHANNEL,
+        name: 'New Lesson Notifications',
+        description: 'Notifications for new approved lessons',
+      );
+      print('New lesson channel created');
+
+      // Handle foreground messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('Got a message whilst in the foreground!');
+        print('Message data: ${message.data}');
+
+        if (message.notification != null) {
+          print('Message also contained a notification: ${message.notification}');
+          _localNotifications.show(
+            message.hashCode,
+            message.notification?.title,
+            message.notification?.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                'high_importance_channel',
+                'High Importance Notifications',
+                channelDescription: 'This channel is used for important notifications.',
+                importance: Importance.max,
+                priority: Priority.high,
+                enableVibration: true,
+                playSound: true,
+              ),
+            ),
+          );
+        }
+      });
+
+      print('Notification service initialized successfully');
+    } catch (e) {
+      print('Error initializing notification service: $e');
+      rethrow;
+    }
+  }
+  
+  // Schedule daily notification
+  Future<void> scheduleDailyNotification({
+    required int id,
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+  }) async {
+    try {
+      // Check for exact alarm permission on Android
+      if (Platform.isAndroid) {
+        final status = await Permission.scheduleExactAlarm.status;
+        print('Exact alarm permission status: $status');
+        
+        if (status.isDenied) {
+          final result = await Permission.scheduleExactAlarm.request();
+          print('Permission request result: $result');
+          
+          if (result.isDenied) {
+            throw PlatformException(
+              code: 'exact_alarms_not_permitted',
+              message: 'Exact alarms permission denied',
+            );
+          }
+        }
+      }
+
+      // Lấy thời gian hiện tại
+      final now = DateTime.now();
+      print('Current time: $now');
+      
+      // Tính thời gian schedule (1 phút sau)
+      final scheduledDate = now.add(const Duration(minutes: 1));
+      print('Scheduling notification for: $scheduledDate');
+      print('Time until notification: ${scheduledDate.difference(now)}');
+
+      await _localNotifications.zonedSchedule(
+        id,
+        title,
+        body,
+        tz.TZDateTime.from(scheduledDate, tz.local),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'high_importance_channel',
+            'High Importance Notifications',
+            channelDescription: 'This channel is used for important notifications.',
+            importance: Importance.max,
+            priority: Priority.high,
+            enableVibration: true,
+            vibrationPattern: Int64List.fromList([0, 1000, 500, 1000]),
+            enableLights: true,
+            playSound: true,
+            icon: '@mipmap/ic_launcher',
+            fullScreenIntent: true,
+            category: AndroidNotificationCategory.alarm,
+            visibility: NotificationVisibility.public,
+            autoCancel: true,
+            showWhen: true,
+            when: scheduledDate.millisecondsSinceEpoch,
+          ),
+        ),
+        androidAllowWhileIdle: true,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      
+      print('Notification scheduled successfully');
+    } catch (e) {
+      print('Error scheduling notification: $e');
+      rethrow;
+    }
+  }
+  
+  // Show immediate notification
+  Future<void> showNotification({
+    required String title,
+    required String body,
+  }) async {
+    try {
+      print('Showing immediate notification');
+      await _localNotifications.show(
+        DateTime.now().millisecond,
         title,
         body,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            channelId,
-            channelId,
-            icon: android?.smallIcon ?? 'mipmap/ic_launcher',
-            importance: Importance.max,
+            'high_importance_channel',
+            'High Importance Notifications',
+            channelDescription: 'This channel is used for important notifications.',
+            importance: Importance.high,
             priority: Priority.high,
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
+            enableVibration: true,
+            playSound: true,
+            icon: '@mipmap/ic_launcher',
           ),
         ),
-        payload: jsonEncode(message.data),
       );
+      print('Immediate notification sent successfully');
+    } catch (e) {
+      print('Error showing notification: $e');
+      rethrow;
     }
   }
   
-  // Handle notification tap action
-  void _handleNotificationTap(String? payload) {
-    if (payload == null) return;
-    
-    try {
-      Map<String, dynamic> data = jsonDecode(payload);
-      String type = data['type'] ?? '';
-      String targetId = data['target_id'] ?? '';
-      
-      debugPrint('Notification tap handler: $type, $targetId');
-      
-      // Use Get.toNamed for navigation based on notification type
-      switch (type) {
-        case 'class_approval':
-          if (targetId.isNotEmpty) {
-            Get.toNamed('/classroom_detail', arguments: {'classId': targetId});
-          }
-          break;
-        case 'new_lesson':
-          if (targetId.isNotEmpty) {
-            final parts = targetId.split(':');
-            if (parts.length >= 2) {
-              Get.toNamed('/lesson_detail', arguments: {
-                'classId': parts[0],
-                'lessonId': parts[1],
-              });
-            }
-          }
-          break;
-        case 'new_test':
-          if (targetId.isNotEmpty) {
-            final parts = targetId.split(':');
-            if (parts.length >= 2) {
-              Get.toNamed('/test_detail', arguments: {
-                'classId': parts[0],
-                'testId': parts[1],
-              });
-            }
-          }
-          break;
-        case 'new_comment':
-          if (targetId.isNotEmpty) {
-            final parts = targetId.split(':');
-            if (parts.length >= 2) {
-              Get.toNamed('/forum_detail', arguments: {
-                'classId': parts[0],
-                'topicId': parts[1],
-              });
-            }
-          }
-          break;
-        case 'teacher_response':
-          if (targetId.isNotEmpty) {
-            Get.toNamed('/feedback_detail', arguments: {'feedbackId': targetId});
-          }
-          break;
-        case 'badge_award':
-          Get.toNamed('/badges');
-          break;
-        case 'daily_reminder':
-          Get.toNamed('/home');
-          break;
-        default:
-          Get.toNamed('/notifications');
-          break;
-      }
-    } catch (e) {
-      debugPrint('Error handling notification tap: $e');
-    }
+  // Cancel all notifications
+  Future<void> cancelAllNotifications() async {
+    await _localNotifications.cancelAll();
   }
 
   // Subscribe user to topic
@@ -637,6 +557,168 @@ class NotificationService {
     } catch (e) {
       debugPrint('Error sending notification: $e');
       throw Exception('Failed to send notification: $e');
+    }
+  }
+
+  // Check if device requires exact alarm permission
+  Future<bool> _requiresExactAlarmPermission() async {
+    if (!Platform.isAndroid) return false;
+    
+    final deviceInfo = await DeviceInfoPlugin().androidInfo;
+    final sdkInt = deviceInfo.version.sdkInt;
+    return sdkInt >= 31; // Android 12 (API level 31) and above
+  }
+
+  // Helper method to create notification channel
+  Future<void> _createNotificationChannel({
+    required String id,
+    required String name,
+    required String description,
+  }) async {
+    final androidChannel = AndroidNotificationChannel(
+      id,
+      name,
+      description: description,
+      importance: Importance.max,
+      enableVibration: true,
+      enableLights: true,
+      playSound: true,
+      showBadge: true,
+      ledColor: const Color.fromARGB(255, 255, 0, 0),
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(androidChannel);
+  }
+
+  // Thông báo cho admin về bài học mới cần phê duyệt
+  Future<void> notifyAdminNewLessonRequest({
+    required String lessonId,
+    required String lessonTitle,
+    required String teacherName,
+    required String className,
+  }) async {
+    try {
+      // Lưu thông báo vào Firestore
+      await _firestore.collection('notifications').add({
+        'type': 'lesson_approval_request',
+        'lessonId': lessonId,
+        'lessonTitle': lessonTitle,
+        'teacherName': teacherName,
+        'className': className,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // Gửi notification đến admin thông qua topic
+      await FirebaseFunctions.instance.httpsCallable('sendNotification').call({
+        'topic': ADMIN_TOPIC,
+        'notification': {
+          'title': 'Yêu cầu phê duyệt bài học mới',
+          'body': 'GV $teacherName đã tạo bài "$lessonTitle" cho lớp $className',
+        },
+        'data': {
+          'type': 'lesson_approval_request',
+          'lessonId': lessonId,
+        },
+      });
+
+      print('Sent notification to admin for lesson approval');
+    } catch (e) {
+      print('Error sending admin notification: $e');
+      rethrow;
+    }
+  }
+
+  // Thông báo cho học sinh về bài học mới được phê duyệt
+  Future<void> notifyStudentsNewLesson({
+    required String classId,
+    required String lessonId,
+    required String lessonTitle,
+    required String teacherName,
+  }) async {
+    try {
+      // Lấy danh sách học sinh trong lớp
+      final classDoc = await _firestore.collection('classes').doc(classId).get();
+      final List<String> studentIds = List<String>.from(classDoc.data()?['studentIds'] ?? []);
+
+      // Batch write notifications cho từng học sinh
+      final batch = _firestore.batch();
+      for (final studentId in studentIds) {
+        final notificationRef = _firestore
+            .collection('users')
+            .doc(studentId)
+            .collection('notifications')
+            .doc();
+        
+        batch.set(notificationRef, {
+          'type': 'new_lesson',
+          'lessonId': lessonId,
+          'lessonTitle': lessonTitle,
+          'teacherName': teacherName,
+          'classId': classId,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+
+      // Gửi notification đến topic của lớp học
+      await FirebaseFunctions.instance.httpsCallable('sendNotification').call({
+        'topic': 'class_$classId',
+        'notification': {
+          'title': 'Bài học mới',
+          'body': 'GV $teacherName đã đăng bài "$lessonTitle"',
+        },
+        'data': {
+          'type': 'new_lesson',
+          'lessonId': lessonId,
+          'classId': classId,
+        },
+      });
+
+      print('Sent notifications to students for new lesson');
+    } catch (e) {
+      print('Error sending student notifications: $e');
+      rethrow;
+    }
+  }
+
+  // Subscribe admin to admin notifications
+  Future<void> subscribeAdminToNotifications(String userId) async {
+    try {
+      // Verify user is admin
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.data()?['role'] == 'admin') {
+        await _firebaseMessaging.subscribeToTopic(ADMIN_TOPIC);
+        print('Admin subscribed to notifications');
+      }
+    } catch (e) {
+      print('Error subscribing admin to notifications: $e');
+      rethrow;
+    }
+  }
+
+  // Subscribe student to class notifications
+  Future<void> subscribeToClassNotifications(String classId) async {
+    try {
+      await _firebaseMessaging.subscribeToTopic('class_$classId');
+      print('Subscribed to class notifications: $classId');
+    } catch (e) {
+      print('Error subscribing to class notifications: $e');
+      rethrow;
+    }
+  }
+
+  // Unsubscribe from class notifications
+  Future<void> unsubscribeFromClassNotifications(String classId) async {
+    try {
+      await _firebaseMessaging.unsubscribeFromTopic('class_$classId');
+      print('Unsubscribed from class notifications: $classId');
+    } catch (e) {
+      print('Error unsubscribing from class notifications: $e');
+      rethrow;
     }
   }
 } 

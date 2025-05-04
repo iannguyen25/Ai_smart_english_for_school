@@ -42,6 +42,8 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
   final OCRService _ocrService = OCRService();
   final ChatGPTService _chatGPTService = ChatGPTService();
   final StorageService _storageService = StorageService();
+  final ImagePicker _imagePicker = ImagePicker();
+  final ScrollController _scrollController = ScrollController();
   bool _isPublic = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -118,8 +120,8 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
     for (var item in _items) {
       switch (item.type) {
         case FlashcardItemType.textToText:
-          if (item.question.isNotEmpty && item.answer.isNotEmpty) {
-            hasValidItems = true;
+      if (item.question.isNotEmpty && item.answer.isNotEmpty) {
+        hasValidItems = true;
           }
           break;
         case FlashcardItemType.imageToText:
@@ -129,38 +131,14 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
             validationError = 'Vui lòng tải lên ảnh cho thẻ kiểu Ảnh - Chữ';
           }
           break;
-        case FlashcardItemType.textToImage:
-          if (item.question.isNotEmpty && item.answerImage != null && item.answerImage!.isNotEmpty) {
-            hasValidItems = true;
-          } else if (item.answerImage == null || item.answerImage!.isEmpty) {
-            validationError = 'Vui lòng tải lên ảnh minh họa cho thẻ kiểu Chữ - Ảnh';
-          }
-          break;
         case FlashcardItemType.imageToImage:
           if (item.questionImage != null && item.questionImage!.isNotEmpty &&
               item.answerImage != null && item.answerImage!.isNotEmpty) {
             hasValidItems = true;
-            // Đảm bảo có giá trị cho question và answer khi lưu
-            _items[_items.indexOf(item)] = item.copyWith(
-              question: item.questionImage!,  // Sử dụng URL ảnh làm giá trị
-              answer: item.answerImage!      // Sử dụng URL ảnh làm giá trị
-            );
           } else {
             validationError = 'Vui lòng tải lên cả ảnh từ vựng và ảnh minh họa cho thẻ kiểu Ảnh - Ảnh';
           }
-          break;
-        case FlashcardItemType.imageOnly:
-          if (item.questionImage != null && item.questionImage!.isNotEmpty) {
-            hasValidItems = true;
-            // Đảm bảo có giá trị cho question và answer khi lưu
-            _items[_items.indexOf(item)] = item.copyWith(
-              question: item.questionImage!,  // Sử dụng URL ảnh làm giá trị
-              answer: item.questionImage!     // Sử dụng URL ảnh làm giá trị
-            );
-          } else {
-            validationError = 'Vui lòng tải lên ảnh cho thẻ kiểu Chỉ Ảnh';
-          }
-          break;
+        break;
       }
       if (validationError != null) break;
     }
@@ -200,8 +178,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
 
         // Cập nhật hoặc tạo các thẻ
         for (var item in _items) {
-          if ((item.type != FlashcardItemType.imageOnly && item.type != FlashcardItemType.imageToImage) && 
-              item.question.isEmpty && item.answer.isEmpty) continue;
+          if (item.question.isEmpty && item.answer.isEmpty) continue;
 
           if (item.id != null) {
             // Cập nhật thẻ hiện có
@@ -229,8 +206,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
 
         // Tạo các thẻ với flashcardId mới
         for (var item in _items) {
-          if ((item.type != FlashcardItemType.imageOnly && item.type != FlashcardItemType.imageToImage) && 
-              item.question.isEmpty && item.answer.isEmpty) continue;
+          if (item.question.isEmpty && item.answer.isEmpty) continue;
 
           final newItem = item.copyWith(flashcardId: flashcardId);
           await _flashcardService.createFlashcardItem(newItem);
@@ -422,12 +398,13 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
     }
   }
 
-  void _addNewItem() {
+  void _addItem() {
     setState(() {
-      _items.add(FlashcardItem(
+      _items.insert(0, FlashcardItem(
         flashcardId: _isEditMode ? widget.flashcard!.id! : '',
         question: '',
         answer: '',
+        type: FlashcardItemType.textToText,
       ));
     });
   }
@@ -461,6 +438,99 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
         question: '',
         answer: '',
       ));
+    }
+  }
+
+  Future<void> _pickQuestionImage(int index) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        print('Uploading question image: ${image.path}');
+        final String url = await _storageService.uploadFile(File(image.path), 'flashcard_images');
+        print('Uploaded question image URL: $url');
+        setState(() {
+          _items[index] = _items[index].copyWith(
+            questionImage: url,
+            // Chỉ set type thành imageToText nếu type hiện tại là textToText
+            type: _items[index].type == FlashcardItemType.textToText 
+                ? FlashcardItemType.imageToText 
+                : _items[index].type,
+          );
+        });
+        print('Updated flashcard item: ${_items[index].toMap()}');
+      }
+    } catch (e) {
+      print('Error picking/uploading question image: $e');
+      Get.snackbar(
+        'Lỗi',
+        'Không thể tải ảnh lên: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _pickAnswerImage(int index) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        print('Uploading answer image: ${image.path}');
+        final String url = await _storageService.uploadFile(File(image.path), 'flashcard_images');
+        print('Uploaded answer image URL: $url');
+        setState(() {
+          _items[index] = _items[index].copyWith(
+            answerImage: url,
+            type: FlashcardItemType.imageToImage,
+          );
+        });
+        print('Updated flashcard item: ${_items[index].toMap()}');
+      }
+    } catch (e) {
+      print('Error picking/uploading answer image: $e');
+      Get.snackbar(
+        'Lỗi',
+        'Không thể tải ảnh lên: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _removeQuestionImage(int index) async {
+    try {
+      if (_items[index].questionImage != null) {
+        await _storageService.deleteFile(_items[index].questionImage!);
+        setState(() {
+          _items[index] = _items[index].copyWith(
+            questionImage: null,
+            questionCaption: null,
+          );
+        });
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Lỗi',
+        'Không thể xóa ảnh: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _removeAnswerImage(int index) async {
+    try {
+      if (_items[index].answerImage != null) {
+        await _storageService.deleteFile(_items[index].answerImage!);
+        setState(() {
+          _items[index] = _items[index].copyWith(
+            answerImage: null,
+            answerCaption: null,
+          );
+        });
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Lỗi',
+        'Không thể xóa ảnh: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 
@@ -501,6 +571,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
         children: [
           Expanded(
             child: SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -572,7 +643,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       ElevatedButton.icon(
-                        onPressed: _addNewItem,
+                        onPressed: _addItem,
                         icon: const Icon(Icons.add),
                         label: const Text('Thêm thẻ'),
                       ),
@@ -581,11 +652,14 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
                   const SizedBox(height: 16),
 
                   // Danh sách các thẻ
-                  ..._items.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final item = entry.value;
-                    return _buildFlashcardItemCard(item, index);
-                  }).toList(),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      return _buildFlashcardItemCard(_items[index], index);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -601,15 +675,11 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
 
     // Cập nhật giá trị khi người dùng thay đổi
     questionController.addListener(() {
-      if (item.type != FlashcardItemType.imageOnly) {
-        _items[index] = _items[index].copyWith(question: questionController.text);
-      }
+      _items[index] = _items[index].copyWith(question: questionController.text);
     });
 
     answerController.addListener(() {
-      if (item.type != FlashcardItemType.imageOnly) {
-        _items[index] = _items[index].copyWith(answer: answerController.text);
-      }
+      _items[index] = _items[index].copyWith(answer: answerController.text);
     });
 
     return Card(
@@ -623,7 +693,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Thẻ ${index + 1}',
+                  'Thẻ ${_items.length - index}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 IconButton(
@@ -641,7 +711,11 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
                 labelText: 'Kiểu thẻ',
                 border: OutlineInputBorder(),
               ),
-              items: FlashcardItemType.values.map((type) {
+              items: [
+                FlashcardItemType.textToText,
+                FlashcardItemType.imageToText,
+                FlashcardItemType.imageToImage,
+              ].map((type) {
                 String label;
                 switch (type) {
                   case FlashcardItemType.textToText:
@@ -650,14 +724,8 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
                   case FlashcardItemType.imageToText:
                     label = 'Ảnh - Chữ';
                     break;
-                  case FlashcardItemType.textToImage:
-                    label = 'Chữ - Ảnh';
-                    break;
                   case FlashcardItemType.imageToImage:
                     label = 'Ảnh - Ảnh';
-                    break;
-                  case FlashcardItemType.imageOnly:
-                    label = 'Chỉ Ảnh';
                     break;
                 }
                 return DropdownMenuItem(
@@ -676,77 +744,165 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
             const SizedBox(height: 16),
 
             // Question section
-            if (_items[index].type == FlashcardItemType.textToText ||
-                _items[index].type == FlashcardItemType.textToImage)
+            if (_items[index].type == FlashcardItemType.textToText) ...[
               TextFormField(
                 controller: questionController,
                 decoration: const InputDecoration(
-                  labelText: 'Từ vựng',
+                  labelText: 'Câu hỏi',
                   border: OutlineInputBorder(),
                 ),
-                maxLines: 2,
-              )
-            else if (_items[index].type == FlashcardItemType.imageToText ||
-                     _items[index].type == FlashcardItemType.imageToImage ||
-                     _items[index].type == FlashcardItemType.imageOnly)
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Vui lòng nhập câu hỏi';
+                  }
+                  return null;
+                },
+              ),
+            ] else if (_items[index].type == FlashcardItemType.imageToText || 
+                      _items[index].type == FlashcardItemType.imageToImage) ...[
+              // Image question with caption
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _items[index].type == FlashcardItemType.imageOnly 
-                      ? 'Ảnh' 
-                      : 'Ảnh từ vựng',
-                    style: Theme.of(context).textTheme.titleSmall
+                  const Text('Ảnh từ vựng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _items[index].questionImage != null
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                _items[index].questionImage!,
+                                fit: BoxFit.cover,
+                              ),
+                              Positioned(
+                                right: 8,
+                                top: 8,
+                                child: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _removeQuestionImage(index),
+                                ),
+                              ),
+                            ],
+                          )
+                        : InkWell(
+                            onTap: () => _pickQuestionImage(index),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.add_photo_alternate, size: 48),
+                              ),
+                            ),
+                          ),
                   ),
                   const SizedBox(height: 8),
-                  _buildImageUpload(
-                    context,
-                    _items[index].questionImage,
-                    (String url) {
+                  TextFormField(
+                    initialValue: _items[index].questionCaption,
+                    decoration: const InputDecoration(
+                      labelText: 'Chú thích ảnh từ vựng',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
                       setState(() {
-                        _items[index] = _items[index].copyWith(
-                          questionImage: url,
-                          // Nếu là kiểu imageOnly, tự động cập nhật question và answer
-                          question: _items[index].type == FlashcardItemType.imageOnly ? url : _items[index].question,
-                          answer: _items[index].type == FlashcardItemType.imageOnly ? url : _items[index].answer,
-                        );
+                        _items[index] = _items[index].copyWith(questionCaption: value);
                       });
+                    },
+                    validator: (value) {
+                      if (_items[index].questionImage != null && (value == null || value.isEmpty)) {
+                        return 'Vui lòng nhập chú thích cho ảnh';
+                      }
+                      return null;
                     },
                   ),
                 ],
               ),
+            ],
             const SizedBox(height: 16),
 
-            // Answer section - chỉ hiển thị nếu KHÔNG phải kiểu imageOnly
-            if (_items[index].type != FlashcardItemType.imageOnly)
+            // Answer section
               if (_items[index].type == FlashcardItemType.textToText ||
-                  _items[index].type == FlashcardItemType.imageToText)
-                TextFormField(
-                  controller: answerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nghĩa/Định nghĩa',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                )
-              else if (_items[index].type == FlashcardItemType.textToImage ||
-                       _items[index].type == FlashcardItemType.imageToImage)
+                _items[index].type == FlashcardItemType.imageToText) ...[
+            TextFormField(
+              controller: answerController,
+              decoration: const InputDecoration(
+                  labelText: 'Câu trả lời',
+                border: OutlineInputBorder(),
+              ),
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Vui lòng nhập câu trả lời';
+                  }
+                  return null;
+                },
+              ),
+            ] else if (_items[index].type == FlashcardItemType.imageToImage) ...[
+              // Image answer with caption
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Ảnh minh họa', style: Theme.of(context).textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    _buildImageUpload(
-                      context,
-                      _items[index].answerImage,
-                      (String url) {
+                  const Text('Ảnh nghĩa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _items[index].answerImage != null
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                _items[index].answerImage!,
+                                fit: BoxFit.cover,
+                              ),
+                              Positioned(
+                                right: 8,
+                                top: 8,
+                                child: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _removeAnswerImage(index),
+                                ),
+                              ),
+                            ],
+                          )
+                        : InkWell(
+                            onTap: () => _pickAnswerImage(index),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.add_photo_alternate, size: 48),
+                              ),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    initialValue: _items[index].answerCaption,
+                    decoration: const InputDecoration(
+                      labelText: 'Chú thích ảnh nghĩa',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
                         setState(() {
-                          _items[index] = _items[index].copyWith(answerImage: url);
+                        _items[index] = _items[index].copyWith(answerCaption: value);
                         });
+                      },
+                    validator: (value) {
+                      if (_items[index].answerImage != null && (value == null || value.isEmpty)) {
+                        return 'Vui lòng nhập chú thích cho ảnh';
+                      }
+                      return null;
                       },
                     ),
                   ],
                 ),
+            ],
           ],
         ),
       ),

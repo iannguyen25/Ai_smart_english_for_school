@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-// import '../../../services/auth_service.dart';
-// import '../../../services/ai_service.dart';
+import 'package:diacritic/diacritic.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/chatgpt_service.dart';
 
 class ChatMessage {
   final String text;
@@ -20,16 +21,17 @@ class AIChatTab extends StatefulWidget {
 }
 
 class _AIChatTabState extends State<AIChatTab> {
-  // final AuthService _authService = AuthService();
-  // final AIService _aiService = AIService();
+  final AuthService _authService = AuthService();
+  final ChatGPTService _chatGPTService = ChatGPTService();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  
+  // Chủ đề hiện tại và lựa chọn
   String _currentTopic = '';
-  int _conversationDepth = 0;
-  List<String> _conversationHistory = [];
-  static const int MAX_HISTORY = 5;
+  String _currentSubTopic = '';
+  bool _waitingForUserInput = false;
 
   @override
   void initState() {
@@ -45,285 +47,302 @@ class _AIChatTabState extends State<AIChatTab> {
   }
 
   void _addInitialMessage() {
+    final user = _authService.currentUser;
+    String greeting = user != null 
+      ? 'Chào ${user.firstName}, rất vui được gặp bạn.' 
+      : 'Chào bạn, rất vui được gặp bạn.';
+      
     setState(() {
       _messages.add(
         ChatMessage(
-          text: 'Hello! I\'m your AI language tutor. How can I help you practice English today?',
+          text: '$greeting\n\nHôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh',
           isUser: false,
         ),
       );
     });
   }
 
-  void _updateConversationState(String text, String response) {
+  void _processUserChoice(String text) {
+    // Chuẩn hóa text input một lần
+    final normalizedText = removeDiacritics(text.toLowerCase());
+    
+    // Xử lý lựa chọn chủ đề chính
+    if (_currentTopic.isEmpty) {
+      if (text.contains('1') || 
+          normalizedText.contains('tu vung') ||
+          normalizedText.contains('vocabulary')) {
+        _setMainTopic('vocabulary');
+      } else if (text.contains('2') || 
+                normalizedText.contains('ngu phap') ||
+                normalizedText.contains('grammar')) {
+        _setMainTopic('grammar');
+      } else if (text.contains('3') || 
+                normalizedText.contains('dich thuat') ||
+                normalizedText.contains('translate')) {
+        _setMainTopic('translation');
+      } else if (text.contains('4') || 
+                normalizedText.contains('doc') ||
+                normalizedText.contains('chuyen') ||
+                normalizedText.contains('bao') ||
+                normalizedText.contains('reading')) {
+        _setMainTopic('reading');
+      } else {
+        _sendBotMessage('Xin lỗi, tôi không hiểu lựa chọn của bạn. Vui lòng chọn một chủ đề:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh');
+      }
+      return;
+    }
+    
+    // Xử lý lựa chọn chủ đề phụ
+    if (_currentSubTopic.isEmpty && !_waitingForUserInput) {
+      _processSubTopicChoice(text);
+      return;
+    }
+    
+    // Xử lý đầu vào của người dùng khi đang chờ
+    if (_waitingForUserInput) {
+      _processUserInput(text);
+      return;
+    }
+    
+    // Reset về menu chính nếu người dùng yêu cầu
+    if (text.toLowerCase().contains('quay lại') || 
+        text.toLowerCase().contains('menu') || 
+        text.toLowerCase().contains('trở về')) {
+      _resetTopics();
+      _sendBotMessage('Hôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh');
+      return;
+    }
+    
+    // Mặc định gửi API nếu không phải lựa chọn
+    _callChatGPTAPI(text);
+  }
+  
+  void _setMainTopic(String topic) {
     setState(() {
-      _conversationHistory.add(text);
-      if (_conversationHistory.length > MAX_HISTORY) {
-        _conversationHistory.removeAt(0);
+      _currentTopic = topic;
+      _currentSubTopic = '';
+    });
+    
+    switch (topic) {
+      case 'vocabulary':
+        _sendBotMessage('Bạn muốn học từ vựng về chủ đề nào:\n\n1. Gia đình\n2. Sức khỏe\n3. Tình yêu\n4. Công việc\n5. Du lịch\n6. Ẩm thực');
+        break;
+      case 'grammar':
+        _sendBotMessage('Bạn muốn học ngữ pháp về phần nào:\n\n1. Thì (Tenses)\n2. Mạo từ (Articles)\n3. Giới từ (Prepositions)\n4. Mệnh đề quan hệ (Relative Clauses)\n5. Câu điều kiện (Conditionals)');
+        break;
+      case 'translation':
+        _sendBotMessage('Vui lòng nhập từ hoặc cụm từ bạn muốn dịch:');
+        setState(() {
+          _waitingForUserInput = true;
+        });
+        break;
+      case 'reading':
+        _sendBotMessage('Bạn muốn đọc bài về chủ đề nào:\n\n1. Văn hóa\n2. Công nghệ\n3. Thể thao\n4. Giáo dục\n5. Môi trường\n6. Khoa học');
+        break;
+    }
+  }
+  
+  void _processSubTopicChoice(String text) {
+    // Chuẩn hóa text input một lần
+    final normalizedText = removeDiacritics(text.toLowerCase());
+    
+    if (_currentTopic == 'vocabulary') {
+      if (text.contains('1') || 
+          normalizedText.contains('gia dinh') ||
+          normalizedText.contains('family')) {
+        _setSubTopic('family');
+      } else if (text.contains('2') || 
+                normalizedText.contains('suc khoe') ||
+                normalizedText.contains('health')) {
+        _setSubTopic('health');
+      } else if (text.contains('3') || 
+                normalizedText.contains('tinh yeu') ||
+                normalizedText.contains('love')) {
+        _setSubTopic('love');
+      } else if (text.contains('4') || 
+                normalizedText.contains('cong viec') ||
+                normalizedText.contains('work')) {
+        _setSubTopic('work');
+      } else if (text.contains('5') || 
+                normalizedText.contains('du lich') ||
+                normalizedText.contains('travel')) {
+        _setSubTopic('travel');
+      } else if (text.contains('6') || 
+                normalizedText.contains('am thuc') ||
+                normalizedText.contains('food')) {
+        _setSubTopic('food');
+      } else {
+        _sendBotMessage('Xin lỗi, tôi không hiểu lựa chọn của bạn. Vui lòng chọn một chủ đề từ vựng hợp lệ (1-6).');
       }
-      
-      // Cập nhật chủ đề hiện tại
-      if (text.toLowerCase().contains('tu vung') || 
-          text.toLowerCase().contains('từ vựng') ||
-          text.toLowerCase().contains('vocabulary')) {
-        _currentTopic = 'vocabulary';
-        _conversationDepth = 1;
-      } else if (text.toLowerCase().contains('ngu phap') ||
-                 text.toLowerCase().contains('ngữ pháp') ||
-                 text.toLowerCase().contains('grammar')) {
-        _currentTopic = 'grammar';
-        _conversationDepth = 1;
-      } else if (text.toLowerCase().contains('dich') ||
-                 text.toLowerCase().contains('dịch') ||
-                 text.toLowerCase().contains('translate')) {
-        _currentTopic = 'translation';
-        _conversationDepth = 1;
-      } else if (text.toLowerCase().contains('luyen noi') ||
-                 text.toLowerCase().contains('luyện nói') ||
-                 text.toLowerCase().contains('speaking')) {
-        _currentTopic = 'speaking';
-        _conversationDepth = 1;
-      } else if (text.toLowerCase().contains('luyen viet') ||
-                 text.toLowerCase().contains('luyện viết') ||
-                 text.toLowerCase().contains('writing')) {
-        _currentTopic = 'writing';
-        _conversationDepth = 1;
-      } else if (text.toLowerCase().contains('phat am') ||
-                 text.toLowerCase().contains('phát âm') ||
-                 text.toLowerCase().contains('pronunciation')) {
-        _currentTopic = 'pronunciation';
-        _conversationDepth = 1;
-      } else if (text.toLowerCase().contains('menu') ||
-                 text.toLowerCase().contains('chính') ||
-                 text.toLowerCase().contains('main')) {
-        _currentTopic = '';
-        _conversationDepth = 0;
-      } else if (_currentTopic.isNotEmpty) {
-        _conversationDepth++;
+    } else if (_currentTopic == 'grammar') {
+      if (text.contains('1') || 
+          normalizedText.contains('thi') ||
+          normalizedText.contains('tenses')) {
+        _setSubTopic('tenses');
+      } else if (text.contains('2') || 
+                normalizedText.contains('mao tu') ||
+                normalizedText.contains('articles')) {
+        _setSubTopic('articles');
+      } else if (text.contains('3') || 
+                normalizedText.contains('gioi tu') ||
+                normalizedText.contains('prepositions')) {
+        _setSubTopic('prepositions');
+      } else if (text.contains('4') || 
+                normalizedText.contains('menh de quan he') ||
+                normalizedText.contains('relative')) {
+        _setSubTopic('relative-clauses');
+      } else if (text.contains('5') || 
+                normalizedText.contains('cau dieu kien') ||
+                normalizedText.contains('conditionals')) {
+        _setSubTopic('conditionals');
+      } else {
+        _sendBotMessage('Xin lỗi, tôi không hiểu lựa chọn của bạn. Vui lòng chọn một chủ đề ngữ pháp hợp lệ (1-5).');
       }
+    } else if (_currentTopic == 'reading') {
+      if (text.contains('1') || 
+          normalizedText.contains('van hoa') ||
+          normalizedText.contains('culture')) {
+        _setSubTopic('culture');
+      } else if (text.contains('2') || 
+                normalizedText.contains('cong nghe') ||
+                normalizedText.contains('technology')) {
+        _setSubTopic('technology');
+      } else if (text.contains('3') || 
+                normalizedText.contains('the thao') ||
+                normalizedText.contains('sports')) {
+        _setSubTopic('sports');
+      } else if (text.contains('4') || 
+                normalizedText.contains('giao duc') ||
+                normalizedText.contains('education')) {
+        _setSubTopic('education');
+      } else if (text.contains('5') || 
+                normalizedText.contains('moi truong') ||
+                normalizedText.contains('environment')) {
+        _setSubTopic('environment');
+      } else if (text.contains('6') || 
+                normalizedText.contains('khoa hoc') ||
+                normalizedText.contains('science')) {
+        _setSubTopic('science');
+      } else {
+        _sendBotMessage('Xin lỗi, tôi không hiểu lựa chọn của bạn. Vui lòng chọn một chủ đề đọc hợp lệ (1-6).');
+      }
+    }
+  }
+  
+  void _setSubTopic(String subTopic) {
+    setState(() {
+      _currentSubTopic = subTopic;
+    });
+    
+    _callChatGPTWithTopic();
+  }
+  
+  void _processUserInput(String text) {
+    setState(() {
+      _waitingForUserInput = false;
+    });
+    
+    if (_currentTopic == 'translation') {
+      _getTranslation(text);
+    } else {
+      _callChatGPTAPI(text);
+    }
+  }
+  
+  void _getTranslation(String text) {
+    _callChatGPTAPI("Dịch từ sau sang tiếng Việt, cho biết loại từ (N, V, ADJ...) và 2 ví dụ sử dụng khác nhau: \"$text\"");
+  }
+  
+  void _callChatGPTWithTopic() {
+    String prompt = '';
+    
+    if (_currentTopic == 'vocabulary') {
+      String topicName = _getTopicDisplayName(_currentSubTopic);
+      prompt = "Cho tôi 15 từ vựng tiếng Anh thông dụng về chủ đề $topicName. Hiển thị dưới dạng danh sách với định dạng: từ tiếng Anh (loại từ) - nghĩa tiếng Việt. Chỉ liệt kê các từ, không cần giải thích thêm.";
+    } else if (_currentTopic == 'grammar') {
+      String topicName = _getTopicDisplayName(_currentSubTopic);
+      prompt = "Giải thích ngữ pháp tiếng Anh về $topicName. Bao gồm: định nghĩa, cách sử dụng, các quy tắc quan trọng và 3-5 ví dụ cụ thể với nghĩa tiếng Việt. Trả lời bằng tiếng Việt.";
+    } else if (_currentTopic == 'reading') {
+      String topicName = _getTopicDisplayName(_currentSubTopic);
+      prompt = "Viết một đoạn văn tiếng Anh khoảng 100-150 từ về chủ đề $topicName. Sau đó dịch sang tiếng Việt. Định dạng: đoạn văn tiếng Anh trước, sau đó là dịch nghĩa tiếng Việt.";
+    }
+    
+    _callChatGPTAPI(prompt);
+  }
+  
+  String _getTopicDisplayName(String topic) {
+    switch (topic) {
+      case 'family': return 'gia đình';
+      case 'health': return 'sức khỏe';
+      case 'love': return 'tình yêu';
+      case 'work': return 'công việc';
+      case 'travel': return 'du lịch';
+      case 'food': return 'ẩm thực';
+      case 'tenses': return 'thì (tenses)';
+      case 'articles': return 'mạo từ (articles)';
+      case 'prepositions': return 'giới từ (prepositions)';
+      case 'relative-clauses': return 'mệnh đề quan hệ (relative clauses)';
+      case 'conditionals': return 'câu điều kiện (conditionals)';
+      case 'culture': return 'văn hóa';
+      case 'technology': return 'công nghệ';
+      case 'sports': return 'thể thao';
+      case 'education': return 'giáo dục';
+      case 'environment': return 'môi trường';
+      case 'science': return 'khoa học';
+      default: return topic;
+    }
+  }
+  
+  void _resetTopics() {
+    setState(() {
+      _currentTopic = '';
+      _currentSubTopic = '';
+      _waitingForUserInput = false;
     });
   }
 
-  String _getContextualResponse(String text) {
-    final lowercaseText = text.toLowerCase();
+  Future<void> _callChatGPTAPI(String text) async {
+    setState(() {
+      _isLoading = true;
+    });
     
-    // Xử lý yêu cầu quay lại menu chính
-    if (lowercaseText.contains('menu') ||
-        lowercaseText.contains('chính') ||
-        lowercaseText.contains('main')) {
-      _currentTopic = '';
-      _conversationDepth = 0;
-      return 'Bạn có thể hỏi tôi về:\n\n1. Từ vựng tiếng Anh\n2. Ngữ pháp\n3. Dịch thuật\n4. Luyện nói\n5. Luyện viết\n6. Phát âm\n\nBạn muốn học về chủ đề nào?';
-    }
-
-    // Xử lý theo ngữ cảnh hiện tại
-    if (_currentTopic.isNotEmpty && _conversationDepth > 2) {
-      switch (_currentTopic) {
-        case 'vocabulary':
-          return _getDetailedVocabularyResponse(text);
-        case 'grammar':
-          return _getDetailedGrammarResponse(text);
-        case 'translation':
-          return _getDetailedTranslationResponse(text);
-        case 'speaking':
-          return _getDetailedSpeakingResponse(text);
-        case 'writing':
-          return _getDetailedWritingResponse(text);
-        case 'pronunciation':
-          return _getDetailedPronunciationResponse(text);
-      }
-    }
-
-    // Xử lý fall-back thông minh
-    if (_currentTopic.isNotEmpty) {
-      return _getSmartFallbackResponse(text);
-    }
-
-    return _getSimulatedResponse(text);
-  }
-
-  String _getDetailedVocabularyResponse(String text) {
-    final lowercaseText = text.toLowerCase();
-    
-    // Xử lý các câu hỏi sâu về từ vựng
-    if (lowercaseText.contains('vi du') || lowercaseText.contains('ví dụ')) {
-      return 'Ví dụ chi tiết về cách sử dụng từ vựng:\n\n1. Trong câu đơn:\n   - "The beautiful sunset painted the sky in vibrant colors"\n   - "She gracefully danced across the stage"\n   - "The ancient castle stood majestically on the hill"\n\n2. Trong câu phức:\n   - "Although it was raining heavily, we decided to go for a walk"\n   - "The book, which was written by a famous author, became a bestseller"\n   - "When the sun sets, the city lights begin to glow"\n\n3. Trong thành ngữ:\n   - "Break a leg" (Chúc may mắn)\n   - "Piece of cake" (Dễ như ăn bánh)\n   - "Hit the books" (Học bài)\n\nBạn muốn:\n1. Xem thêm ví dụ\n2. Học về cách sử dụng từ vựng\n3. Quay lại menu chính';
-    } else if (lowercaseText.contains('cach su dung') || lowercaseText.contains('cách sử dụng')) {
-      return 'Cách sử dụng từ vựng hiệu quả:\n\n1. Học từ vựng theo ngữ cảnh:\n   - Đọc sách, báo, tạp chí\n   - Xem phim, nghe nhạc\n   - Giao tiếp với người bản ngữ\n\n2. Ghi nhớ từ vựng:\n   - Sử dụng flashcards\n   - Tạo mindmap\n   - Viết nhật ký\n\n3. Luyện tập:\n   - Viết câu với từ mới\n   - Nói chuyện sử dụng từ mới\n   - Làm bài tập từ vựng\n\nBạn muốn:\n1. Xem ví dụ cụ thể\n2. Học thêm phương pháp\n3. Quay lại menu chính';
-    }
-    
-    return _getSimulatedResponse(text);
-  }
-
-  String _getDetailedGrammarResponse(String text) {
-    final lowercaseText = text.toLowerCase();
-    
-    if (lowercaseText.contains('vi du') || lowercaseText.contains('ví dụ')) {
-      return 'Ví dụ chi tiết về ngữ pháp:\n\n1. Thì hiện tại đơn:\n   - "I go to school every day"\n   - "She works in a hospital"\n   - "They live in London"\n\n2. Thì hiện tại tiếp diễn:\n   - "I am studying now"\n   - "She is working on a project"\n   - "They are playing football"\n\n3. Thì quá khứ đơn:\n   - "I went to school yesterday"\n   - "She worked late last night"\n   - "They lived in Paris"\n\nBạn muốn:\n1. Xem thêm ví dụ\n2. Học về cách sử dụng thì\n3. Quay lại menu chính';
-    } else if (lowercaseText.contains('cach su dung') || lowercaseText.contains('cách sử dụng')) {
-      return 'Cách sử dụng ngữ pháp hiệu quả:\n\n1. Hiểu rõ cấu trúc:\n   - Học công thức\n   - Nhận biết dấu hiệu\n   - Phân biệt các thì\n\n2. Luyện tập:\n   - Làm bài tập\n   - Viết câu\n   - Nói chuyện\n\n3. Ứng dụng:\n   - Đọc sách\n   - Xem phim\n   - Giao tiếp\n\nBạn muốn:\n1. Xem ví dụ cụ thể\n2. Học thêm phương pháp\n3. Quay lại menu chính';
-    }
-    
-    return _getSimulatedResponse(text);
-  }
-
-  String _getDetailedTranslationResponse(String text) {
-    final lowercaseText = text.toLowerCase();
-    
-    if (lowercaseText.contains('vi du') || lowercaseText.contains('ví dụ')) {
-      return 'Ví dụ về dịch thuật:\n\n1. Dịch câu đơn:\n   - "Tôi đi học" → "I go to school"\n   - "Cô ấy đang làm việc" → "She is working"\n   - "Họ sống ở London" → "They live in London"\n\n2. Dịch câu phức:\n   - "Mặc dù trời mưa, chúng tôi vẫn đi dạo" → "Although it was raining, we still went for a walk"\n   - "Cuốn sách, được viết bởi một tác giả nổi tiếng, đã trở thành bestseller" → "The book, which was written by a famous author, became a bestseller"\n\n3. Dịch thành ngữ:\n   - "Chúc may mắn" → "Break a leg"\n   - "Dễ như ăn bánh" → "Piece of cake"\n   - "Học bài" → "Hit the books"\n\nBạn muốn:\n1. Xem thêm ví dụ\n2. Học về cách dịch\n3. Quay lại menu chính';
-    } else if (lowercaseText.contains('cach dich') || lowercaseText.contains('cách dịch')) {
-      return 'Cách dịch thuật hiệu quả:\n\n1. Hiểu ngữ cảnh:\n   - Đọc kỹ văn bản\n   - Xác định mục đích\n   - Nắm bắt ý chính\n\n2. Kỹ thuật dịch:\n   - Dịch từng câu\n   - Dịch theo đoạn\n   - Dịch theo ý\n\n3. Kiểm tra:\n   - So sánh với bản gốc\n   - Kiểm tra ngữ pháp\n   - Kiểm tra từ vựng\n\nBạn muốn:\n1. Xem ví dụ cụ thể\n2. Học thêm phương pháp\n3. Quay lại menu chính';
-    }
-    
-    return _getSimulatedResponse(text);
-  }
-
-  String _getDetailedSpeakingResponse(String text) {
-    final lowercaseText = text.toLowerCase();
-    
-    if (lowercaseText.contains('vi du') || lowercaseText.contains('ví dụ')) {
-      return 'Ví dụ về luyện nói:\n\n1. Hội thoại hàng ngày:\n   - "How are you?" - "I\'m fine, thank you"\n   - "What do you do?" - "I\'m a student"\n   - "Where are you from?" - "I\'m from Vietnam"\n\n2. Thuyết trình:\n   - "Today, I will talk about..."\n   - "First, let me explain..."\n   - "In conclusion, I would like to..."\n\n3. Phỏng vấn:\n   - "Tell me about yourself"\n   - "What are your strengths?"\n   - "Where do you see yourself in 5 years?"\n\nBạn muốn:\n1. Xem thêm ví dụ\n2. Học về cách nói\n3. Quay lại menu chính';
-    } else if (lowercaseText.contains('cach noi') || lowercaseText.contains('cách nói')) {
-      return 'Cách luyện nói hiệu quả:\n\n1. Phát âm:\n   - Luyện âm\n   - Luyện ngữ điệu\n   - Luyện nhịp điệu\n\n2. Từ vựng:\n   - Học từ mới\n   - Sử dụng từ vựng\n   - Mở rộng vốn từ\n\n3. Ngữ pháp:\n   - Sử dụng đúng thì\n   - Sử dụng đúng cấu trúc\n   - Sử dụng đúng từ loại\n\nBạn muốn:\n1. Xem ví dụ cụ thể\n2. Học thêm phương pháp\n3. Quay lại menu chính';
-    }
-    
-    return _getSimulatedResponse(text);
-  }
-
-  String _getDetailedWritingResponse(String text) {
-    final lowercaseText = text.toLowerCase();
-    
-    if (lowercaseText.contains('vi du') || lowercaseText.contains('ví dụ')) {
-      return 'Ví dụ về luyện viết:\n\n1. Email:\n   - "Dear Mr. Smith,"\n   - "I am writing to inform you..."\n   - "Best regards,"\n\n2. Bài luận:\n   - Introduction: Giới thiệu chủ đề\n   - Body: Phát triển ý\n   - Conclusion: Kết luận\n\n3. Báo cáo:\n   - Executive Summary\n   - Introduction\n   - Findings\n   - Conclusion\n\nBạn muốn:\n1. Xem thêm ví dụ\n2. Học về cách viết\n3. Quay lại menu chính';
-    } else if (lowercaseText.contains('cach viet') || lowercaseText.contains('cách viết')) {
-      return 'Cách luyện viết hiệu quả:\n\n1. Cấu trúc:\n   - Mở bài\n   - Thân bài\n   - Kết bài\n\n2. Nội dung:\n   - Ý tưởng\n   - Luận điểm\n   - Dẫn chứng\n\n3. Ngôn ngữ:\n   - Từ vựng\n   - Ngữ pháp\n   - Văn phong\n\nBạn muốn:\n1. Xem ví dụ cụ thể\n2. Học thêm phương pháp\n3. Quay lại menu chính';
-    }
-    
-    return _getSimulatedResponse(text);
-  }
-
-  String _getDetailedPronunciationResponse(String text) {
-    final lowercaseText = text.toLowerCase();
-    
-    if (lowercaseText.contains('vi du') || lowercaseText.contains('ví dụ')) {
-      return 'Ví dụ về phát âm:\n\n1. Nguyên âm:\n   - /i:/ as in "see"\n   - /ɪ/ as in "sit"\n   - /e/ as in "bed"\n\n2. Phụ âm:\n   - /p/ as in "pen"\n   - /b/ as in "bed"\n   - /t/ as in "ten"\n\n3. Trọng âm:\n   - "REcord" (noun)\n   - "reCORD" (verb)\n   - "PHOtograph"\n\nBạn muốn:\n1. Xem thêm ví dụ\n2. Học về cách phát âm\n3. Quay lại menu chính';
-    } else if (lowercaseText.contains('cach phat am') || lowercaseText.contains('cách phát âm')) {
-      return 'Cách luyện phát âm hiệu quả:\n\n1. Nguyên âm:\n   - Mở miệng\n   - Đặt lưỡi\n   - Phát âm\n\n2. Phụ âm:\n   - Môi\n   - Lưỡi\n   - Hơi\n\n3. Trọng âm:\n   - Nhấn mạnh\n   - Lên giọng\n   - Xuống giọng\n\nBạn muốn:\n1. Xem ví dụ cụ thể\n2. Học thêm phương pháp\n3. Quay lại menu chính';
-    }
-    
-    return _getSimulatedResponse(text);
-  }
-
-  String _getSmartFallbackResponse(String text) {
-    // Phân tích câu hỏi và đưa ra câu trả lời liên quan đến chủ đề hiện tại
-    final lowercaseText = text.toLowerCase();
-    
-    if (_currentTopic == 'vocabulary') {
-      if (lowercaseText.contains('nghia') || lowercaseText.contains('nghĩa')) {
-        return 'Bạn đang muốn tìm hiểu về nghĩa của từ. Tôi có thể giúp bạn:\n\n1. Giải thích nghĩa của từ\n2. Đưa ra ví dụ sử dụng\n3. Chỉ ra các từ đồng nghĩa/trái nghĩa\n\nBạn muốn tìm hiểu về từ nào?';
-      } else if (lowercaseText.contains('cach hoc') || lowercaseText.contains('cách học')) {
-        return 'Để học từ vựng hiệu quả, bạn có thể:\n\n1. Học theo chủ đề\n2. Sử dụng flashcards\n3. Luyện tập thường xuyên\n4. Áp dụng vào thực tế\n\nBạn muốn tìm hiểu thêm về phương pháp nào?';
-      }
-    }
-    
-    return 'Tôi hiểu bạn đang nói về chủ đề $_currentTopic. Bạn có thể:\n\n1. Hỏi cụ thể hơn về chủ đề này\n2. Chuyển sang chủ đề khác\n3. Quay lại menu chính\n\nBạn muốn làm gì tiếp theo?';
-  }
-
-  String _getSimulatedResponse(String text) {
-    final lowercaseText = text.toLowerCase();
-
-    // Xử lý các từ khóa tiếng Việt có dấu và không dấu
-    if (lowercaseText.contains('xin chao') ||
-        lowercaseText.contains('xin chào') ||
-        lowercaseText.contains('chao') ||
-        lowercaseText.contains('chào') ||
-        lowercaseText.contains('hi')) {
-      return 'Xin chào! Bạn có thể hỏi tôi về:\n- Từ vựng tiếng Anh\n- Ngữ pháp\n- Dịch thuật\n- Luyện nói\n- Luyện viết';
-    } else if (lowercaseText.contains('tu vung') ||
-        lowercaseText.contains('từ vựng') ||
-        lowercaseText.contains('vocabulary')) {
-      return 'Tôi có thể giúp bạn học từ vựng theo các chủ đề:\n\n1. Từ vựng cơ bản\n2. Từ vựng chuyên ngành\n3. Từ vựng theo cấp độ (A1-C2)\n4. Từ vựng theo chủ đề\n\nBạn muốn học từ vựng về chủ đề nào?';
-    } else if (lowercaseText.contains('ngu phap') ||
-        lowercaseText.contains('ngữ pháp') ||
-        lowercaseText.contains('grammar')) {
-      return 'Tôi có thể giúp bạn học ngữ pháp về:\n\n1. Các thì trong tiếng Anh\n2. Cấu trúc câu\n3. Mệnh đề quan hệ\n4. Câu điều kiện\n5. Câu bị động\n\nBạn muốn học phần ngữ pháp nào?';
-    } else if (lowercaseText.contains('dich') ||
-        lowercaseText.contains('dịch') ||
-        lowercaseText.contains('translate')) {
-      return 'Tôi có thể giúp bạn dịch:\n\n1. Từ tiếng Việt sang tiếng Anh\n2. Từ tiếng Anh sang tiếng Việt\n3. Đoạn văn\n4. Câu thành ngữ\n\nBạn muốn dịch gì?';
-    } else if (lowercaseText.contains('luyen noi') ||
-        lowercaseText.contains('luyện nói') ||
-        lowercaseText.contains('speaking')) {
-      return 'Tôi có thể giúp bạn luyện nói về:\n\n1. Giao tiếp hàng ngày\n2. Thuyết trình\n3. Phỏng vấn\n4. Thảo luận\n\nBạn muốn luyện nói về chủ đề nào?';
-    } else if (lowercaseText.contains('luyen viet') ||
-        lowercaseText.contains('luyện viết') ||
-        lowercaseText.contains('writing')) {
-      return 'Tôi có thể giúp bạn luyện viết:\n\n1. Email\n2. Bài luận\n3. Báo cáo\n4. CV\n\nBạn muốn luyện viết dạng nào?';
-    } else if (lowercaseText.contains('phat am') ||
-        lowercaseText.contains('phát âm') ||
-        lowercaseText.contains('pronunciation')) {
-      return 'Tôi có thể giúp bạn luyện phát âm:\n\n1. Nguyên âm (Vowels)\n2. Phụ âm (Consonants)\n3. Trọng âm (Stress)\n4. Ngữ điệu (Intonation)\n\nBạn muốn luyện phần phát âm nào?';
-    } else if (lowercaseText.contains('cam on') ||
-        lowercaseText.contains('cảm ơn') ||
-        lowercaseText.contains('thank')) {
-      return 'Không có gì! Tôi rất vui được giúp bạn. Bạn có thể hỏi tôi bất cứ điều gì về tiếng Anh.';
-    } else if (lowercaseText.contains('tam biet') ||
-        lowercaseText.contains('tạm biệt') ||
-        lowercaseText.contains('goodbye')) {
-      return 'Tạm biệt! Hẹn gặp lại bạn trong buổi học tiếp theo. Chúc bạn học tốt!';
-    } else {
-      return 'Tôi có thể giúp gì cho bạn? Bạn có thể hỏi tôi về:\n- Từ vựng\n- Ngữ pháp\n- Dịch thuật\n- Luyện nói\n- Luyện viết\n- Phát âm';
+    try {
+      // Tạo prompt với hướng dẫn ngôn ngữ
+      String finalPrompt = "Bạn là trợ lý học tiếng Anh. Trả lời bằng tiếng Việt. Chỉ hỗ trợ các chủ đề liên quan đến việc học tiếng Anh, từ chối các câu hỏi về chủ đề khác. Luôn trả lời đơn giản, dễ hiểu và đúng trọng tâm. Dưới đây là yêu cầu của tôi:\n\n$text";
+      
+      // Gọi API Cohere thông qua ChatGPT Service
+      String response = await _chatGPTService.fixText(finalPrompt);
+      
+      // Hiển thị kết quả
+      _sendBotMessage(response);
+    } catch (e) {
+      print("Error calling ChatGPT API: $e");
+      _sendBotMessage("Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.");
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
-
-  void _handleSubmitted(String text) async {
+  
+  void _sendBotMessage(String message) {
+    setState(() {
+      _messages.add(ChatMessage(text: message, isUser: false));
+    });
+    _scrollToBottom();
+  }
+  
+  void _handleSubmitted(String text) {
     if (text.trim().isEmpty) return;
 
     _textController.clear();
 
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true));
-      _isLoading = true;
     });
 
     _scrollToBottom();
-
-    try {
-      final randomDelay = Duration(milliseconds: 1000 + (DateTime.now().millisecond % 2000));
-      await Future.delayed(randomDelay);
-
-      setState(() {
-        _messages.add(ChatMessage(text: '...', isUser: false));
-      });
-      _scrollToBottom();
-      
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      setState(() {
-        _messages.removeLast();
-      });
-
-      final response = _getContextualResponse(text);
-      _updateConversationState(text, response);
-
-      setState(() {
-        _messages.add(ChatMessage(text: response, isUser: false));
-        _isLoading = false;
-      });
-
-      _scrollToBottom();
-    } catch (e) {
-      setState(() {
-        _messages.add(ChatMessage(
-          text: 'Xin lỗi, tôi gặp lỗi: ${e.toString()}',
-          isUser: false,
-        ));
-        _isLoading = false;
-      });
-
-      _scrollToBottom();
-    }
+    _processUserChoice(text);
   }
 
   void _scrollToBottom() {
@@ -349,20 +368,22 @@ class _AIChatTabState extends State<AIChatTab> {
               if (value == 'clear') {
                 setState(() {
                   _messages.clear();
+                  _resetTopics();
                   _addInitialMessage();
                 });
-              } else if (value == 'settings') {
-                // Navigate to chat settings
+              } else if (value == 'menu') {
+                _resetTopics();
+                _sendBotMessage('Hôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh');
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'clear',
-                child: Text('Clear conversation'),
+                child: Text('Xóa cuộc trò chuyện'),
               ),
               const PopupMenuItem(
-                value: 'settings',
-                child: Text('Chat settings'),
+                value: 'menu',
+                child: Text('Quay lại menu chính'),
               ),
             ],
           ),
@@ -382,8 +403,8 @@ class _AIChatTabState extends State<AIChatTab> {
             ),
           ),
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: LinearProgressIndicator(),
             ),
           _buildInputArea(),
@@ -453,28 +474,16 @@ class _AIChatTabState extends State<AIChatTab> {
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.mic),
-            onPressed: () {
-              // Implement voice input
-            },
-          ),
           Expanded(
             child: TextField(
               controller: _textController,
               decoration: const InputDecoration(
-                hintText: 'Nhập câu hỏi...',
+                hintText: 'Nhập câu hỏi hoặc lựa chọn...',
                 border: InputBorder.none,
               ),
               textCapitalization: TextCapitalization.sentences,
               onSubmitted: _isLoading ? null : _handleSubmitted,
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.translate),
-            onPressed: () {
-              // Implement translation feature
-            },
           ),
           IconButton(
             icon: const Icon(Icons.send),

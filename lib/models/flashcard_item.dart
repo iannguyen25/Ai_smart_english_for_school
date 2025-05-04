@@ -2,10 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum FlashcardItemType {
   textToText,    // Text question - Text answer
-  imageToText,   // Image question - Text answer
-  textToImage,   // Text question - Image answer
-  imageToImage,  // Image question - Image answer
-  imageOnly,     // Single image, no text or illustration
+  imageToImage,  // Image question - Image answer (both with captions)
+  imageToText,   // Image question (with caption) - Text answer
 }
 
 class FlashcardItem {
@@ -15,6 +13,8 @@ class FlashcardItem {
   final String answer;            // Text answer
   final String? questionImage;    // Image URL for question
   final String? answerImage;      // Image URL for answer
+  final String? questionCaption;  // Caption for question image
+  final String? answerCaption;    // Caption for answer image
   final FlashcardItemType type;   // Type of flashcard
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -26,6 +26,8 @@ class FlashcardItem {
     required this.answer,
     this.questionImage,
     this.answerImage,
+    this.questionCaption,
+    this.answerCaption,
     this.type = FlashcardItemType.textToText,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -41,6 +43,8 @@ class FlashcardItem {
       answer: map['answer'] ?? '',
       questionImage: map['questionImage'],
       answerImage: map['answerImage'],
+      questionCaption: map['questionCaption'],
+      answerCaption: map['answerCaption'],
       type: FlashcardItemType.values.firstWhere(
         (e) => e.toString() == map['type'],
         orElse: () => FlashcardItemType.textToText,
@@ -57,6 +61,8 @@ class FlashcardItem {
       'answer': answer,
       'questionImage': questionImage,
       'answerImage': answerImage,
+      'questionCaption': questionCaption,
+      'answerCaption': answerCaption,
       'type': type.toString(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -64,22 +70,27 @@ class FlashcardItem {
   }
 
   FlashcardItem copyWith({
+    String? id,
     String? flashcardId,
     String? question,
     String? answer,
     String? questionImage,
     String? answerImage,
+    String? questionCaption,
+    String? answerCaption,
     FlashcardItemType? type,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
     return FlashcardItem(
-      id: this.id,
+      id: id ?? this.id,
       flashcardId: flashcardId ?? this.flashcardId,
       question: question ?? this.question,
       answer: answer ?? this.answer,
       questionImage: questionImage ?? this.questionImage,
       answerImage: answerImage ?? this.answerImage,
+      questionCaption: questionCaption ?? this.questionCaption,
+      answerCaption: answerCaption ?? this.answerCaption,
       type: type ?? this.type,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

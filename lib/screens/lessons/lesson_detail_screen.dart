@@ -24,6 +24,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../exercises/exercise_detail_screen.dart';
+import '../../services/analytics_service.dart';
 
 class LessonDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -44,6 +45,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
   final _userService = UserService();
   final _auth = auth.FirebaseAuth.instance;
   final _flashcardService = FlashcardService();
+  final _analyticsService = AnalyticsService();
   
   late TabController _tabController;
   Lesson? _lesson;
@@ -64,6 +66,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
   // Video controllers
   Map<String, dynamic> _videoControllers = {};
   int _currentVideoIndex = 0;
+  bool _isTracking = false;
+  double _videoWatchedPercentage = 0.0;
   
   @override
   void initState() {
@@ -394,13 +398,48 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
             ),
           );
           
-          // Thêm listener để kiểm tra lỗi
+          // Thêm listener để tracking tiến trình xem video
           (_videoControllers[url] as YoutubePlayerController).addListener(() {
             final playerValue = (_videoControllers[url] as YoutubePlayerController).value;
-            if (!playerValue.isReady) {
-              print('YouTube player is not ready');
-            } else {
-              print('YouTube player ready');
+            if (playerValue.isReady) {
+              // Chỉ track khi video đang chạy
+              if (playerValue.isPlaying && !_isTracking && _lesson != null) {
+                _startVideoTracking();
+              }
+              
+              // Tính toán phần trăm đã xem
+              if (playerValue.position.inSeconds > 0 && playerValue.metaData.duration.inSeconds > 0) {
+                final percentage = playerValue.position.inSeconds / playerValue.metaData.duration.inSeconds;
+                
+                // Cập nhật trạng thái phần trăm đã xem
+                setState(() {
+                  _videoWatchedPercentage = percentage;
+                });
+                
+                // Tự động đánh dấu hoàn thành khi đạt 80%
+                if (percentage >= 0.8 && !_videoWatched) {
+                  setState(() {
+                    _videoWatched = true;
+                  });
+                  _updateLearningProgress();
+                  _logVideoActivity(
+                    videoId: videoId ?? '', 
+                    videoTitle: _lesson!.videos[_currentVideoIndex].title ?? 'Unknown',
+                    isCompleted: true,
+                    watchedPercentage: percentage
+                  );
+                }
+                
+                // Log hoạt động mỗi 10% xem
+                if ((percentage * 10).floor() > (_videoWatchedPercentage * 10).floor()) {
+                  _logVideoActivity(
+                    videoId: videoId ?? '', 
+                    videoTitle: _lesson!.videos[_currentVideoIndex].title ?? 'Unknown',
+                    isCompleted: false,
+                    watchedPercentage: percentage
+                  );
+                }
+              }
             }
           });
           
@@ -422,6 +461,50 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
             setState(() {
               _videoControllers[url] = _videoControllers[url];
             }); // Trigger rebuild to show video player
+            
+            // Thêm listener để tracking tiến trình xem video
+            (_videoControllers[url] as VideoPlayerController).addListener(() {
+              final controller = _videoControllers[url] as VideoPlayerController;
+              
+              // Chỉ track khi video đang chạy
+              if (controller.value.isPlaying && !_isTracking && _lesson != null) {
+                _startVideoTracking();
+              }
+              
+              // Tính toán phần trăm đã xem
+              if (controller.value.position.inSeconds > 0 && controller.value.duration.inSeconds > 0) {
+                final percentage = controller.value.position.inSeconds / controller.value.duration.inSeconds;
+                
+                // Cập nhật trạng thái phần trăm đã xem
+                setState(() {
+                  _videoWatchedPercentage = percentage;
+                });
+                
+                // Tự động đánh dấu hoàn thành khi đạt 80%
+                if (percentage >= 0.8 && !_videoWatched) {
+                  setState(() {
+                    _videoWatched = true;
+                  });
+                  _updateLearningProgress();
+                  _logVideoActivity(
+                    videoId: url, 
+                    videoTitle: _lesson!.videos[_currentVideoIndex].title ?? 'Unknown',
+                    isCompleted: true,
+                    watchedPercentage: percentage
+                  );
+                }
+                
+                // Log hoạt động mỗi 10% xem
+                if ((percentage * 10).floor() > (_videoWatchedPercentage * 10).floor()) {
+                  _logVideoActivity(
+                    videoId: url, 
+                    videoTitle: _lesson!.videos[_currentVideoIndex].title ?? 'Unknown',
+                    isCompleted: false,
+                    watchedPercentage: percentage
+                  );
+                }
+              }
+            });
           }
         }).catchError((error) {
           print('Error initializing video player: $error');
@@ -447,6 +530,62 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
       
       throw Exception('Không thể tải video: $e');
     }
+  }
+  
+  // Track video viewing session
+  void _startVideoTracking() {
+    setState(() {
+      _isTracking = true;
+    });
+    
+    // Log bắt đầu xem video
+    if (_lesson != null && _currentVideoIndex < _lesson!.videos.length) {
+      final videoId = _lesson!.videos[_currentVideoIndex].url.contains('youtube')
+          ? _extractYouTubeVideoId(_lesson!.videos[_currentVideoIndex].url)
+          : _lesson!.videos[_currentVideoIndex].url;
+      
+      _logVideoActivity(
+        videoId: videoId, 
+        videoTitle: _lesson!.videos[_currentVideoIndex].title ?? 'Unknown',
+        isCompleted: false,
+        watchedPercentage: 0.0,
+        action: 'start_watching'
+      );
+    }
+  }
+  
+  // Extract YouTube video ID
+  String _extractYouTubeVideoId(String url) {
+    if (url.contains('youtube.com/watch')) {
+      return Uri.parse(url).queryParameters['v'] ?? url;
+    } else if (url.contains('youtu.be/')) {
+      return url.split('youtu.be/')[1].split('?')[0];
+    }
+    return url;
+  }
+  
+  // Log video activity to firestore
+  void _logVideoActivity({
+    required String videoId,
+    required String videoTitle,
+    required bool isCompleted,
+    required double watchedPercentage,
+    String action = 'progress_update'
+  }) {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || _lesson == null) return;
+    
+    _analyticsService.trackVideoActivity(
+      userId: currentUser.uid,
+      lessonId: widget.lessonId,
+      classroomId: widget.classroomId,
+      videoId: videoId,
+      videoTitle: videoTitle,
+      action: action,
+      isCompleted: isCompleted,
+      watchedPercentage: watchedPercentage,
+      timestamp: DateTime.now(),
+    );
   }
   
   // Đánh dấu đã xem video
@@ -1405,9 +1544,24 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                         onEnded: (metaData) {
                           setState(() {
                             _videoWatched = true;
+                            _videoWatchedPercentage = 1.0;
                           });
                           _updateLearningProgress();
+                          
+                          final videoId = _extractYouTubeVideoId(_lesson!.videos[_currentVideoIndex].url);
+                          _logVideoActivity(
+                            videoId: videoId,
+                            videoTitle: _lesson!.videos[_currentVideoIndex].title ?? 'Unknown',
+                            isCompleted: true,
+                            watchedPercentage: 1.0,
+                            action: 'finished_watching'
+                          );
                         },
+                        progressIndicatorColor: Colors.red,
+                        progressColors: const ProgressBarColors(
+                          playedColor: Colors.red,
+                          handleColor: Colors.redAccent,
+                        ),
                       )
                     else if (_videoControllers[_lesson!.videos[_currentVideoIndex].url] is VideoPlayerController &&
                             (_videoControllers[_lesson!.videos[_currentVideoIndex].url] as VideoPlayerController).value.isInitialized)
@@ -1636,6 +1790,32 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                 final folder = _lesson!.folders[index];
                 return _buildFolderCard(folder, index);
               },
+            ),
+          ],
+          
+          // Add progress indicator in the video section
+          if (!_isLoadingProgress && _videoWatchedPercentage > 0 && _videoWatchedPercentage < 1.0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: _videoWatchedPercentage,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      _videoWatchedPercentage >= 0.8 ? Colors.green : Colors.blue,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${(_videoWatchedPercentage * 100).toInt()}%',
+                  style: TextStyle(
+                    color: _videoWatchedPercentage >= 0.8 ? Colors.green : Colors.blue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ],
         ],

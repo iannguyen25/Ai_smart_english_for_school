@@ -359,39 +359,39 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
                 Expanded(
                   child: Container(
                     padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: Column(
+                    child: Column(
+                      children: [
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _showAnswer ? 'Câu trả lời:' : 'Câu hỏi:',
-                                  style: Theme.of(context).textTheme.titleMedium,
-                                  textAlign: TextAlign.center,
-                                ),
-                                if (!item.type.toString().contains('image')) ...[
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    onPressed: () {
-                                      _speak(_showAnswer ? item.answer : item.question);
-                                    },
-                                    icon: Icon(
-                                      _isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
-                                      color: _isSpeaking ? Colors.blue : Colors.grey,
-                                    ),
-                                    tooltip: 'Nghe phát âm',
-                                  ),
-                                ],
-                              ],
+                            Text(
+                              _showAnswer ? 'Câu trả lời:' : 'Câu hỏi:',
+                              style: Theme.of(context).textTheme.titleMedium,
+                              textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 16),
-                            _buildFlashcardContent(item),
+                            if ((item.type == FlashcardItemType.textToText) ||
+                                (_showAnswer && item.type == FlashcardItemType.imageToText)) ...[
+                              const SizedBox(width: 8),
+                              IconButton(
+                                onPressed: () {
+                                  _speak(_showAnswer ? item.answer : item.question);
+                                },
+                                icon: Icon(
+                                  _isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
+                                  color: _isSpeaking ? Colors.blue : Colors.grey,
+                                ),
+                                tooltip: 'Nghe phát âm',
+                              ),
+                            ],
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: _buildFlashcardContent(item, !_showAnswer),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -436,151 +436,99 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
     );
   }
 
-  Widget _buildFlashcardContent(FlashcardItem item) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (!_showAnswer) ...[
-          // Hiển thị phần câu hỏi
-          if (item.type == FlashcardItemType.imageOnly || 
-              item.type == FlashcardItemType.imageToText ||
-              item.type == FlashcardItemType.imageToImage) ...[
-            if (item.questionImage != null && item.questionImage!.isNotEmpty)
-              Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.8,
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    item.questionImage!,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
-                      );
-                    },
-                  ),
+  Widget _buildFlashcardContent(FlashcardItem item, bool isQuestion) {
+    if (isQuestion) {
+      switch (item.type) {
+        case FlashcardItemType.textToText:
+          return Center(
+            child: Container(
+              constraints: const BoxConstraints(
+                minHeight: 200,
+              ),
+              child: Center(
+                child: Text(
+                  item.question,
+                  style: const TextStyle(fontSize: 24),
+                  textAlign: TextAlign.center,
                 ),
               ),
-          ] else
-            Text(
-              item.question,
-              style: Theme.of(context).textTheme.headlineMedium,
-              textAlign: TextAlign.center,
             ),
-        ] else ...[
-          // Hiển thị phần câu trả lời
-          if (item.type == FlashcardItemType.imageOnly) ...[
-            if (item.questionImage != null && item.questionImage!.isNotEmpty)
-              Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.8,
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    item.questionImage!,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
-                      );
-                    },
+          );
+        case FlashcardItemType.imageToText:
+        case FlashcardItemType.imageToImage:
+          return Container(
+            constraints: const BoxConstraints(minHeight: 200),
+            child: Column(
+              children: [
+                if (item.questionImage != null)
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    child: Image.network(
+                      item.questionImage!,
+                      fit: BoxFit.contain,
+                    ),
                   ),
-                ),
-              ),
-          ] else if (item.type == FlashcardItemType.imageToImage) ...[
-            if (item.answerImage != null && item.answerImage!.isNotEmpty)
-              Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.8,
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    item.answerImage!,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
-                      );
-                    },
+                if (item.questionCaption != null)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      item.questionCaption!,
+                      style: const TextStyle(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
-              ),
-          ] else if (item.type == FlashcardItemType.textToImage) ...[
-            if (item.answerImage != null && item.answerImage!.isNotEmpty)
-              Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.8,
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    item.answerImage!,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Icon(Icons.error_outline, color: Colors.red, size: 48),
-                      );
-                    },
-                  ),
-                ),
-              ),
-          ] else
-            Text(
-              item.answer,
-              style: Theme.of(context).textTheme.headlineMedium,
-              textAlign: TextAlign.center,
+              ],
             ),
-        ],
-      ],
-    );
+          );
+      }
+    } else {
+      switch (item.type) {
+        case FlashcardItemType.textToText:
+        case FlashcardItemType.imageToText:
+          return Center(
+            child: Container(
+              constraints: const BoxConstraints(
+                minHeight: 200,
+              ),
+              child: Center(
+                child: Text(
+                  item.answer,
+                  style: const TextStyle(fontSize: 24),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          );
+        case FlashcardItemType.imageToImage:
+          return Container(
+            constraints: const BoxConstraints(minHeight: 200),
+            child: Column(
+              children: [
+                if (item.answerImage != null)
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    child: Image.network(
+                      item.answerImage!,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                if (item.answerCaption != null)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      item.answerCaption!,
+                      style: const TextStyle(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
+            ),
+          );
+      }
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildCompletionScreen() {

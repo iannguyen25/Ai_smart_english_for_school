@@ -1,3 +1,5 @@
+import 'package:base_flutter_framework/screens/settings/notification_settings_screen.dart';
+import 'package:base_flutter_framework/screens/test/notification_test_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:get/get.dart';
@@ -64,6 +66,18 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
             icon: const Icon(Icons.check_circle_outline),
             tooltip: 'Đánh dấu tất cả đã đọc',
             onPressed: _loading ? null : _markAllAsRead,
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Cài đặt',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotificationTestScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),

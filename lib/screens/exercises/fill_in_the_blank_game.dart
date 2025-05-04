@@ -160,6 +160,7 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
+                    if (currentItem.type == FlashcardItemType.textToText) ...[
                     Text(
                       currentItem.question,
                       style: const TextStyle(
@@ -168,13 +169,47 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    if (currentItem.questionImage != null) ...[
-                      const SizedBox(height: 16),
-                      Image.network(
+                    ] else if (currentItem.questionImage != null) ...[
+                      Container(
+                        constraints: const BoxConstraints(
+                          minHeight: 120,
+                          maxHeight: 200,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
                         currentItem.questionImage!,
-                        height: 200,
-                        fit: BoxFit.cover,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                      : null,
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Icon(Icons.error_outline, color: Colors.red),
+                              );
+                            },
+                          ),
+                        ),
                       ),
+                      if (currentItem.questionCaption != null && 
+                          currentItem.questionCaption!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          currentItem.questionCaption!,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                      ),
+                      ],
                     ],
                   ],
                 ),

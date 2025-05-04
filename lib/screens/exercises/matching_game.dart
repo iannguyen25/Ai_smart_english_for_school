@@ -24,6 +24,8 @@ class _MatchingGameState extends State<MatchingGame> {
   int _matches = 0;
   List<bool> _matchedQuestions = [];
   List<bool> _matchedAnswers = [];
+  Map<int, bool> _wrongQuestions = {};
+  Map<int, bool> _wrongAnswers = {};
 
   @override
   void initState() {
@@ -32,8 +34,24 @@ class _MatchingGameState extends State<MatchingGame> {
   }
 
   void _initializeGame() {
-    // Lọc bỏ các item chỉ có ảnh
-    final validItems = widget.items.where((item) => item.type != FlashcardItemType.imageOnly).toList();
+    // Lọc bỏ các item không hợp lệ
+    final validItems = widget.items.where((item) {
+      switch (item.type) {
+        case FlashcardItemType.textToText:
+          return item.question.isNotEmpty && item.answer.isNotEmpty;
+        case FlashcardItemType.imageToText:
+          return item.questionImage != null && 
+                 item.questionImage!.isNotEmpty && 
+                 item.answer.isNotEmpty;
+        case FlashcardItemType.imageToImage:
+          return item.questionImage != null && 
+                 item.questionImage!.isNotEmpty && 
+                 item.answerImage != null && 
+                 item.answerImage!.isNotEmpty;
+        default:
+          return false;
+      }
+    }).toList();
     
     // Tạo bản sao của items để không ảnh hưởng đến dữ liệu gốc
     _questions = List.from(validItems);
@@ -81,15 +99,16 @@ class _MatchingGameState extends State<MatchingGame> {
 
   void _checkMatch() {
     if (_selectedQuestion != null && _selectedAnswer != null) {
+      final questionIndex = _questions.indexOf(_selectedQuestion!);
+      final answerIndex = _answers.indexOf(_selectedAnswer!);
       final isMatch = _selectedQuestion!.id == _selectedAnswer!.id;
       
       if (isMatch) {
-        final questionIndex = _questions.indexOf(_selectedQuestion!);
-        final answerIndex = _answers.indexOf(_selectedAnswer!);
-        
         setState(() {
           _matchedQuestions[questionIndex] = true;
           _matchedAnswers[answerIndex] = true;
+          _wrongQuestions.remove(questionIndex);
+          _wrongAnswers.remove(answerIndex);
           _matches++;
           _score += 10;
         });
@@ -98,6 +117,21 @@ class _MatchingGameState extends State<MatchingGame> {
         if (_matches == _questions.length) {
           _showFinalScore();
         }
+      } else {
+        setState(() {
+          _wrongQuestions[questionIndex] = true;
+          _wrongAnswers[answerIndex] = true;
+          if (_score > 0) _score -= 2;
+        });
+
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            setState(() {
+              _wrongQuestions.remove(questionIndex);
+              _wrongAnswers.remove(answerIndex);
+            });
+          }
+        });
       }
       
       setState(() {
@@ -158,20 +192,27 @@ class _MatchingGameState extends State<MatchingGame> {
   Widget _buildQuestionContent(FlashcardItem item) {
     switch (item.type) {
       case FlashcardItemType.textToText:
-      case FlashcardItemType.textToImage:
-        return Text(item.question);
+        return Text(
+          item.question,
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        );
       
       case FlashcardItemType.imageToText:
       case FlashcardItemType.imageToImage:
         if (item.questionImage != null && item.questionImage!.isNotEmpty) {
-          return Container(
-            height: 100,
-            width: double.infinity,
+          return Column(
+            children: [
+              Container(
+                constraints: const BoxConstraints(
+                  minHeight: 120,
+                  maxHeight: 180,
+                ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
                 item.questionImage!,
-                fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return Center(
@@ -189,12 +230,31 @@ class _MatchingGameState extends State<MatchingGame> {
                 },
               ),
             ),
+              ),
+              if (item.questionCaption != null && item.questionCaption!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    item.questionCaption!,
+                    style: const TextStyle(fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
           );
         }
-        return Text(item.question);
+        return Text(
+          item.question,
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        );
       
       default:
-        return Text(item.question);
+        return Text(
+          item.question,
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        );
     }
   }
 
@@ -202,19 +262,26 @@ class _MatchingGameState extends State<MatchingGame> {
     switch (item.type) {
       case FlashcardItemType.textToText:
       case FlashcardItemType.imageToText:
-        return Text(item.answer);
+        return Text(
+          item.answer,
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        );
       
-      case FlashcardItemType.textToImage:
       case FlashcardItemType.imageToImage:
         if (item.answerImage != null && item.answerImage!.isNotEmpty) {
-          return Container(
-            height: 100,
-            width: double.infinity,
+          return Column(
+            children: [
+              Container(
+                constraints: const BoxConstraints(
+                  minHeight: 120,
+                  maxHeight: 180,
+                ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
                 item.answerImage!,
-                fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return Center(
@@ -232,12 +299,31 @@ class _MatchingGameState extends State<MatchingGame> {
                 },
               ),
             ),
+              ),
+              if (item.answerCaption != null && item.answerCaption!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    item.answerCaption!,
+                    style: const TextStyle(fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
           );
         }
-        return Text(item.answer);
+        return Text(
+          item.answer,
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        );
       
       default:
-        return Text(item.answer);
+        return Text(
+          item.answer,
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        );
     }
   }
 
@@ -274,12 +360,10 @@ class _MatchingGameState extends State<MatchingGame> {
       ),
       body: Column(
         children: [
-          // Progress indicator
           LinearProgressIndicator(
             value: _matches / _questions.length,
             backgroundColor: Colors.grey.shade200,
           ),
-          
           Expanded(
             child: Row(
               children: [
@@ -292,20 +376,37 @@ class _MatchingGameState extends State<MatchingGame> {
                       final item = _questions[index];
                       final isSelected = _selectedQuestion == item;
                       final isMatched = _matchedQuestions[index];
+                      final isWrong = _wrongQuestions[index] == true;
                       
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         color: isMatched
                             ? Colors.green.shade50
+                            : isWrong
+                                ? Colors.red.shade50
                             : isSelected
                                 ? Colors.blue.shade50
                                 : null,
-                        child: ListTile(
-                          title: _buildQuestionContent(item),
-                          onTap: () => _selectQuestion(item, index),
-                          trailing: isMatched
-                              ? const Icon(Icons.check, color: Colors.green)
-                              : null,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: InkWell(
+                            onTap: isMatched ? null : () => _selectQuestion(item, index),
+                            child: Column(
+                              children: [
+                                _buildQuestionContent(item),
+                                if (isMatched)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Icon(Icons.check_circle, color: Colors.green.shade700),
+                                  )
+                                else if (isWrong)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Icon(Icons.cancel, color: Colors.red.shade700),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       );
                     },
@@ -321,20 +422,37 @@ class _MatchingGameState extends State<MatchingGame> {
                       final item = _answers[index];
                       final isSelected = _selectedAnswer == item;
                       final isMatched = _matchedAnswers[index];
+                      final isWrong = _wrongAnswers[index] == true;
                       
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         color: isMatched
                             ? Colors.green.shade50
+                            : isWrong
+                                ? Colors.red.shade50
                             : isSelected
                                 ? Colors.blue.shade50
                                 : null,
-                        child: ListTile(
-                          title: _buildAnswerContent(item),
-                          onTap: () => _selectAnswer(item, index),
-                          trailing: isMatched
-                              ? const Icon(Icons.check, color: Colors.green)
-                              : null,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: InkWell(
+                            onTap: isMatched ? null : () => _selectAnswer(item, index),
+                            child: Column(
+                              children: [
+                                _buildAnswerContent(item),
+                                if (isMatched)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Icon(Icons.check_circle, color: Colors.green.shade700),
+                                  )
+                                else if (isWrong)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Icon(Icons.cancel, color: Colors.red.shade700),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                       );
                     },

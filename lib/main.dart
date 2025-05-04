@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'services/notification_service.dart';
 
 // Define a top-level handler for background messages
 @pragma('vm:entry-point')
@@ -65,6 +66,15 @@ void _handleError(Object error, StackTrace stack) {
 }
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+
   // Set custom error handler
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
@@ -74,7 +84,7 @@ Future<void> main() async {
   // Handle zone errors
   runZonedGuarded(() async {
     // Ensure Flutter is initialized
-  WidgetsFlutterBinding.ensureInitialized();
+    WidgetsFlutterBinding.ensureInitialized();
 
     // Initialize Firebase with proper error handling
     bool isFirebaseInitialized = false;
