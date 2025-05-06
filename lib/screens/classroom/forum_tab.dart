@@ -561,7 +561,7 @@ class _ForumTabState extends State<ForumTab> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Người dùng ${discussion.userId}',
+                            'Người dùng ${discussion.userName}',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                             ),
