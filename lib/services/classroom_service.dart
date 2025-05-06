@@ -191,20 +191,36 @@ class ClassroomService {
     String? userId,
   }) async {
     try {
+      print('Searching classrooms with query: $query for user: $userId');
+      
+      final authService = AuthService();
+      final isAdmin = authService.isCurrentUserAdmin;
+      print('Is admin: $isAdmin');
+
       Query classroomsQuery = _classroomsRef;
 
-      // Nếu có userId, lấy các lớp công khai và lớp mà user là thành viên
-      if (userId != null) {
+      if (isAdmin) {
+        print('User is admin, searching all classrooms');
+        // Admin có thể tìm kiếm tất cả lớp học
+      } else if (userId != null) {
+        print('User is not admin, searching only accessible classrooms');
+        // Nếu không phải admin, chỉ tìm trong các lớp:
+        // 1. Lớp mà user là giáo viên
+        // 2. Lớp mà user là thành viên
+        // 3. Lớp công khai
         classroomsQuery = classroomsQuery.where(Filter.or(
-          Filter('isPublic', isEqualTo: true),
+          Filter('teacherId', isEqualTo: userId),
           Filter('memberIds', arrayContains: userId),
+          // Filter('isPublic', isEqualTo: true),
         ));
       } else {
-        // Nếu không có userId, chỉ lấy lớp công khai
+        print('No user ID, searching only public classrooms');
+        // Nếu không có userId, chỉ tìm lớp công khai
         classroomsQuery = classroomsQuery.where('isPublic', isEqualTo: true);
       }
 
       final snapshot = await classroomsQuery.get();
+      print('Found ${snapshot.docs.length} classrooms before filtering');
 
       // Lọc kết quả theo query
       final results = snapshot.docs.where((doc) {
@@ -218,6 +234,7 @@ class ClassroomService {
         return Classroom.fromMap(doc.data() as Map<String, dynamic>, doc.id);
       }).toList();
 
+      print('Found ${results.length} classrooms after filtering');
       return results;
     } catch (e) {
       print('Error searching classrooms: $e');
