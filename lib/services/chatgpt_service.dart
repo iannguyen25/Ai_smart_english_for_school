@@ -53,6 +53,7 @@ class ChatGPTService {
       print('Raw API Response body: ${response.body}');
 
       if (response.statusCode == 200) {
+        // Decode response body với UTF-8
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         final result = data['text'] ?? text;
         print('Final processed text: $result');
@@ -101,11 +102,12 @@ class ChatGPTService {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        // Decode response body với UTF-8
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
         final content = data['text'] ?? '[]';
         
         // Debug: In ra nội dung response để kiểm tra lỗi font
-        print('API Response content: $content');
+        print('API Response content: ${utf8.decode(response.bodyBytes)}');
         
         try {
           // Tìm chuỗi JSON trong response
@@ -129,6 +131,10 @@ class ChatGPTService {
           
           print('JSON string to parse: $jsonStr');
           
+          // Clean JSON string trước khi parse
+          jsonStr = jsonStr.replaceAll('``', '"').replaceAll('`', '"');
+          
+          // Decode JSON string với UTF-8
           List<dynamic> rawCards = jsonDecode(jsonStr);
           print('Parsed cards: $rawCards');
           
