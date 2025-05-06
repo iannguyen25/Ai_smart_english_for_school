@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await _authService.signInWithEmailAndPassword(
+      final result = await _authService.login(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );

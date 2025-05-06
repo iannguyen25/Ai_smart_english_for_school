@@ -5,17 +5,19 @@ import '../../models/flashcard_item.dart';
 
 class MatchingGame extends StatefulWidget {
   final List<FlashcardItem> items;
+  final int maxItems;
 
   const MatchingGame({
     Key? key,
     required this.items,
+    this.maxItems = 10, // Mặc định 12 thẻ, có thể điều chỉnh từ 10-15
   }) : super(key: key);
 
   @override
   _MatchingGameState createState() => _MatchingGameState();
 }
 
-class _MatchingGameState extends State<MatchingGame> {
+class _MatchingGameState extends State<MatchingGame> with SingleTickerProviderStateMixin {
   List<FlashcardItem> _questions = [];
   List<FlashcardItem> _answers = [];
   FlashcardItem? _selectedQuestion;
@@ -26,6 +28,10 @@ class _MatchingGameState extends State<MatchingGame> {
   List<bool> _matchedAnswers = [];
   Map<int, bool> _wrongQuestions = {};
   Map<int, bool> _wrongAnswers = {};
+  Map<int, double> _questionOpacity = {};
+  Map<int, double> _answerOpacity = {};
+  Map<int, double> _questionHeight = {};
+  Map<int, double> _answerHeight = {};
 
   @override
   void initState() {
@@ -33,9 +39,9 @@ class _MatchingGameState extends State<MatchingGame> {
     _initializeGame();
   }
 
-  void _initializeGame() {
+  List<FlashcardItem> _getRandomItems(List<FlashcardItem> items) {
     // Lọc bỏ các item không hợp lệ
-    final validItems = widget.items.where((item) {
+    final validItems = items.where((item) {
       switch (item.type) {
         case FlashcardItemType.textToText:
           return item.question.isNotEmpty && item.answer.isNotEmpty;
@@ -52,10 +58,27 @@ class _MatchingGameState extends State<MatchingGame> {
           return false;
       }
     }).toList();
+
+    // Nếu số lượng item hợp lệ ít hơn hoặc bằng maxItems, trả về tất cả
+    if (validItems.length <= widget.maxItems) {
+      return List.from(validItems);
+    }
+
+    // Tạo một bản sao của danh sách để tránh ảnh hưởng đến dữ liệu gốc
+    final shuffledItems = List<FlashcardItem>.from(validItems);
+    shuffledItems.shuffle();
+
+    // Lấy ngẫu nhiên maxItems thẻ
+    return shuffledItems.take(widget.maxItems).toList();
+  }
+
+  void _initializeGame() {
+    // Lấy ngẫu nhiên các thẻ
+    final selectedItems = _getRandomItems(widget.items);
     
     // Tạo bản sao của items để không ảnh hưởng đến dữ liệu gốc
-    _questions = List.from(validItems);
-    _answers = List.from(validItems);
+    _questions = List.from(selectedItems);
+    _answers = List.from(selectedItems);
     
     // Trộn ngẫu nhiên
     _questions.shuffle();
@@ -64,6 +87,14 @@ class _MatchingGameState extends State<MatchingGame> {
     // Khởi tạo trạng thái đã ghép
     _matchedQuestions = List.filled(_questions.length, false);
     _matchedAnswers = List.filled(_answers.length, false);
+    
+    // Khởi tạo opacity và height cho tất cả các thẻ
+    for (int i = 0; i < _questions.length; i++) {
+      _questionOpacity[i] = 1.0;
+      _answerOpacity[i] = 1.0;
+      _questionHeight[i] = 1.0;
+      _answerHeight[i] = 1.0;
+    }
     
     _matches = 0;
     _score = 0;
@@ -111,6 +142,18 @@ class _MatchingGameState extends State<MatchingGame> {
           _wrongAnswers.remove(answerIndex);
           _matches++;
           _score += 10;
+        });
+
+        // Thêm hiệu ứng fade out và thu nhỏ sau 1 giây
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            setState(() {
+              _questionOpacity[questionIndex] = 0.0;
+              _answerOpacity[answerIndex] = 0.0;
+              _questionHeight[questionIndex] = 0.0;
+              _answerHeight[answerIndex] = 0.0;
+            });
+          }
         });
         
         // Kiểm tra nếu đã ghép hết
@@ -201,46 +244,49 @@ class _MatchingGameState extends State<MatchingGame> {
       case FlashcardItemType.imageToText:
       case FlashcardItemType.imageToImage:
         if (item.questionImage != null && item.questionImage!.isNotEmpty) {
-          return Column(
-            children: [
-              Container(
-                constraints: const BoxConstraints(
-                  minHeight: 120,
-                  maxHeight: 180,
-                ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                item.questionImage!,
-                    fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                          : null,
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: constraints.maxWidth,
+                    height: constraints.maxWidth * 0.6, // Tỷ lệ 5:3
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        item.questionImage!,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(Icons.error_outline, color: Colors.red),
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Icon(Icons.error_outline, color: Colors.red),
-                  );
-                },
-              ),
-            ),
-              ),
-              if (item.questionCaption != null && item.questionCaption!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    item.questionCaption!,
-                    style: const TextStyle(fontSize: 14),
-                    textAlign: TextAlign.center,
                   ),
-                ),
-            ],
+                  if (item.questionCaption != null && item.questionCaption!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        item.questionCaption!,
+                        style: const TextStyle(fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              );
+            }
           );
         }
         return Text(
@@ -270,46 +316,49 @@ class _MatchingGameState extends State<MatchingGame> {
       
       case FlashcardItemType.imageToImage:
         if (item.answerImage != null && item.answerImage!.isNotEmpty) {
-          return Column(
-            children: [
-              Container(
-                constraints: const BoxConstraints(
-                  minHeight: 120,
-                  maxHeight: 180,
-                ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                item.answerImage!,
-                    fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                          : null,
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: constraints.maxWidth,
+                    height: constraints.maxWidth * 0.6, // Tỷ lệ 5:3
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        item.answerImage!,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(Icons.error_outline, color: Colors.red),
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Icon(Icons.error_outline, color: Colors.red),
-                  );
-                },
-              ),
-            ),
-              ),
-              if (item.answerCaption != null && item.answerCaption!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    item.answerCaption!,
-                    style: const TextStyle(fontSize: 14),
-                    textAlign: TextAlign.center,
                   ),
-                ),
-            ],
+                  if (item.answerCaption != null && item.answerCaption!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        item.answerCaption!,
+                        style: const TextStyle(fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              );
+            }
           );
         }
         return Text(
@@ -378,33 +427,42 @@ class _MatchingGameState extends State<MatchingGame> {
                       final isMatched = _matchedQuestions[index];
                       final isWrong = _wrongQuestions[index] == true;
                       
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        color: isMatched
-                            ? Colors.green.shade50
-                            : isWrong
-                                ? Colors.red.shade50
-                            : isSelected
-                                ? Colors.blue.shade50
-                                : null,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: InkWell(
-                            onTap: isMatched ? null : () => _selectQuestion(item, index),
-                            child: Column(
-                              children: [
-                                _buildQuestionContent(item),
-                                if (isMatched)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Icon(Icons.check_circle, color: Colors.green.shade700),
-                                  )
-                                else if (isWrong)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Icon(Icons.cancel, color: Colors.red.shade700),
-                                  ),
-                              ],
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 500),
+                        height: (_questionHeight[index] ?? 1.0) * (item.type == FlashcardItemType.imageToImage ? 180 : 100),
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 500),
+                          opacity: _questionOpacity[index] ?? 1.0,
+                          child: Card(
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            color: isMatched
+                                ? Colors.green.shade50
+                                : isWrong
+                                    ? Colors.red.shade50
+                                : isSelected
+                                    ? Colors.blue.shade50
+                                    : null,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: InkWell(
+                                onTap: isMatched ? null : () => _selectQuestion(item, index),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildQuestionContent(item),
+                                    if (isMatched)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Icon(Icons.check_circle, color: Colors.green.shade700),
+                                      )
+                                    else if (isWrong)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Icon(Icons.cancel, color: Colors.red.shade700),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -424,33 +482,42 @@ class _MatchingGameState extends State<MatchingGame> {
                       final isMatched = _matchedAnswers[index];
                       final isWrong = _wrongAnswers[index] == true;
                       
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        color: isMatched
-                            ? Colors.green.shade50
-                            : isWrong
-                                ? Colors.red.shade50
-                            : isSelected
-                                ? Colors.blue.shade50
-                                : null,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: InkWell(
-                            onTap: isMatched ? null : () => _selectAnswer(item, index),
-                            child: Column(
-                              children: [
-                                _buildAnswerContent(item),
-                                if (isMatched)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Icon(Icons.check_circle, color: Colors.green.shade700),
-                                  )
-                                else if (isWrong)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Icon(Icons.cancel, color: Colors.red.shade700),
-                                  ),
-                              ],
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 500),
+                        height: (_answerHeight[index] ?? 1.0) * (item.type == FlashcardItemType.imageToImage ? 180 : 100),
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 500),
+                          opacity: _answerOpacity[index] ?? 1.0,
+                          child: Card(
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            color: isMatched
+                                ? Colors.green.shade50
+                                : isWrong
+                                    ? Colors.red.shade50
+                                : isSelected
+                                    ? Colors.blue.shade50
+                                    : null,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: InkWell(
+                                onTap: isMatched ? null : () => _selectAnswer(item, index),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildAnswerContent(item),
+                                    if (isMatched)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Icon(Icons.check_circle, color: Colors.green.shade700),
+                                      )
+                                    else if (isWrong)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: Icon(Icons.cancel, color: Colors.red.shade700),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),

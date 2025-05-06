@@ -14,6 +14,7 @@ class User extends BaseModel {
   final int longestStreak;
   final DateTime? lastStudiedDate;
   final List<String> badges;
+  final bool isActive;
 
   User({
     String? id,
@@ -28,6 +29,7 @@ class User extends BaseModel {
     this.longestStreak = 0,
     this.lastStudiedDate,
     this.badges = const [],
+    this.isActive = true,
   }) : super(
           id: id,
           createdAt: createdAt,
@@ -50,6 +52,7 @@ class User extends BaseModel {
           ? (map['lastStudiedDate'] as Timestamp).toDate() 
           : null,
       badges: List<String>.from(map['badges'] ?? []),
+      isActive: map['isActive'] ?? true,
     );
   }
 
@@ -69,6 +72,7 @@ class User extends BaseModel {
           ? Timestamp.fromDate(lastStudiedDate!) 
           : null,
       'badges': badges,
+      'isActive': isActive,
     };
   }
 
@@ -88,6 +92,7 @@ class User extends BaseModel {
     int? longestStreak,
     DateTime? lastStudiedDate,
     List<String>? badges,
+    bool? isActive,
   }) {
     return User(
       id: id ?? this.id,
@@ -102,6 +107,7 @@ class User extends BaseModel {
       longestStreak: longestStreak ?? this.longestStreak,
       lastStudiedDate: lastStudiedDate ?? this.lastStudiedDate,
       badges: badges ?? this.badges,
+      isActive: isActive ?? this.isActive,
     );
   }
   
@@ -204,6 +210,7 @@ class User extends BaseModel {
         'longestStreak': 0,
         'lastStudiedDate': null,
         'badges': [],
+        'isActive': true,
       });
 
       final userData = await userDoc.get();

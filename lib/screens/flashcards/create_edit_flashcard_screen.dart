@@ -540,12 +540,11 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
       appBar: AppBar(
         title: Text(_isEditMode ? 'Chỉnh sửa bộ thẻ' : 'Tạo bộ thẻ mới'),
         actions: [
-          if (!_isEditMode)
-            IconButton(
-              icon: const Icon(Icons.camera_alt),
-              onPressed: _isProcessingOCR ? null : _scanImage,
-              tooltip: 'Quét ảnh để tạo thẻ',
-            ),
+          IconButton(
+            icon: const Icon(Icons.camera_alt),
+            onPressed: _isProcessingOCR ? null : _scanImage,
+            tooltip: 'Quét ảnh để tạo thẻ',
+          ),
           TextButton(
             onPressed: _isLoading ? null : _saveFlashcard,
             child: Text(

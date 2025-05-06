@@ -17,6 +17,7 @@ import '../../materials/student_materials_screen.dart';
 import '../../profile/badges_screen.dart';
 import '../../settings/notification_settings_screen.dart';
 import '../../../services/notification_service.dart';
+import '../../profile/change_password_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({Key? key}) : super(key: key);
@@ -467,108 +468,52 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildOptionsSection() {
-    final user = _authService.currentUser;
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Tùy chọn',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
+      child: Column(
+        children: [
+          _buildOptionTile(
+            'Chỉnh sửa thông tin',
+            Icons.edit,
+            () => Get.to(() => EditProfileScreen(user: _authService.currentUser!))?.then((value) {
+              if (value != null) {
+                _refreshUserData();
+              }
+            }),
+          ),
+          _buildOptionTile(
+            'Đổi mật khẩu',
+            Icons.lock,
+            () => Get.to(() => const ChangePasswordScreen()),
+          ),
+          _buildOptionTile(
+            'Cài đặt thông báo',
+            Icons.notifications,
+            () => Get.to(() => const NotificationSettingsScreen()),
+          ),
+          if (_authService.isCurrentUserAdmin)
             _buildOptionTile(
-              'Chỉnh sửa thông tin',
-              Icons.edit,
-              () => Get.to(() => EditProfileScreen(user: user ?? User())),
+              'Dashboard',
+              Icons.dashboard,
+              () => Get.to(() => const AdminDashboardScreen()),
             ),
+          if (_authService.isCurrentUserAdmin)
             _buildOptionTile(
-              'Lớp học của tôi',
-              Icons.class_,
-              () => Get.to(() => const ClassroomListScreen()),
+              'Quản lý người dùng',
+              Icons.admin_panel_settings,
+              () => Get.to(() => const UserManagementScreen()),
             ),
+          if (_authService.isCurrentUserAdmin || _authService.isCurrentUserTeacher)
             _buildOptionTile(
-              'Huy hiệu của tôi',
-              Icons.emoji_events,
-              () => Get.to(() => const BadgesScreen()),
+              'Quản lý tài liệu',
+              Icons.menu_book,
+              () => Get.to(() => const TeacherMaterialsScreen()),
             ),
-            _buildOptionTile(
-              'Thông báo',
-              Icons.notifications_active,
-              () => Get.to(() => const NotificationHistoryScreen()),
-              badgeCount: _unreadNotificationCount,
-            ),
-            _buildOptionTile(
-              'Lời nhắc học tập',
-              Icons.alarm,
-              () => AlertDialog(
-                title: const Text('Chức năng đang phát triển'),
-                content: const Text('Chức năng đang phát triển'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Get.back(),
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-            ),
-            _buildOptionTile(
-              'Cài đặt thông báo',
-              Icons.notifications,
-              () => Get.to(() => const NotificationSettingsScreen()),
-            ),
-            // _buildOptionTile(
-            //   'Cài đặt ngôn ngữ',
-            //   Icons.language,
-            //   () => Get.toNamed('/language_settings'),
-            // ),
-            if (_authService.isCurrentUserAdmin)
-              _buildOptionTile(
-                'Dashboard',
-                Icons.dashboard,
-                () => Get.to(() => const AdminDashboardScreen()),
-              ),
-              // _buildOptionTile(
-              //   'Trợ giúp & Hỗ trợ',
-              //   Icons.help,
-              //   () => Get.toNamed('/help'),
-              // ),
-            // Chỉ hiển thị quản lý người dùng cho admin
-            if (_authService.isCurrentUserAdmin)
-              _buildOptionTile(
-                'Quản lý người dùng',
-                Icons.admin_panel_settings,
-                () => Get.to(() => const UserManagementScreen()),
-              ),
-            // Thêm tùy chọn quản lý tài liệu học tập
-            if (_authService.isCurrentUserAdmin || _authService.isCurrentUserTeacher)
-              _buildOptionTile(
-                'Quản lý tài liệu',
-                Icons.menu_book,
-                () => Get.to(() => const TeacherMaterialsScreen()),
-              ),
-            _buildOptionTile(
-              'Thư viện tài liệu',
-              Icons.library_books,
-              () => Get.to(() => const StudentMaterialsScreen()),
-            ),
-            if (_authService.isCurrentUserAdmin)
-            _buildOptionTile(
-              'Xóa tài khoản',
-              Icons.delete_forever,
-              () => Get.to(() => DeleteAccountScreen()),
-            ),
-          ],
-        ),
+          _buildOptionTile(
+            'Thư viện tài liệu',
+            Icons.library_books,
+            () => Get.to(() => const StudentMaterialsScreen()),
+          ),
+        ],
       ),
     );
   }

@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../../services/auth_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
+  const ChangePasswordScreen({Key? key}) : super(key: key);
+
   @override
   _ChangePasswordScreenState createState() => _ChangePasswordScreenState();
 }
@@ -45,7 +47,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         Get.back();
         Get.snackbar(
           'Thành công',
-          'Mật khẩu của bạn đã được thay đổi',
+          'Mật khẩu đã được thay đổi',
           snackPosition: SnackPosition.BOTTOM,
         );
       } else {
@@ -113,12 +115,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Vui lòng nhập mật khẩu hiện tại của bạn';
+                    return 'Vui lòng nhập mật khẩu hiện tại';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _newPasswordController,
                 obscureText: _obscureNewPassword,
@@ -147,7 +149,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
@@ -168,15 +170,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Vui lòng xác nhận mật khẩu mới của bạn';
+                    return 'Vui lòng xác nhận mật khẩu mới';
                   }
                   if (value != _newPasswordController.text) {
-                    return 'Mật khẩu không khớp';
+                    return 'Mật khẩu xác nhận không khớp';
                   }
                   return null;
                 },
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _changePassword,
                 style: ElevatedButton.styleFrom(

@@ -199,14 +199,13 @@ class AuthService {
   }
 
   // Sign in with email and password
-  Future<AuthResult> signInWithEmailAndPassword({
+  Future<AuthResult> login({
     required String email,
     required String password,
   }) async {
     try {
       // Sign in with our safe handler
-      final userCredential =
-          await FirebaseUserHandler.signInWithEmailAndPassword(
+      final userCredential = await FirebaseUserHandler.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -217,32 +216,27 @@ class AuthService {
 
       // Get user data from Firestore
       try {
-        final userDoc =
-            await FirebaseUserHandler.getUserDocument(userCredential.user!.uid);
+        final userDoc = await FirebaseUserHandler.getUserDocument(userCredential.user!.uid);
         if (userDoc == null || !userDoc.exists) {
           return AuthResult(success: false, error: 'User data not found');
         }
 
         final userData = userDoc.data() as Map<String, dynamic>;
-        final user =
-            FirebaseUserHandler.convertToAppUser(userCredential.user, userData);
+        
+        // Check if user is active
+        if (userData['isActive'] == false) {
+          return AuthResult(
+            success: false,
+            error: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.',
+          );
+        }
 
+        final user = FirebaseUserHandler.convertToAppUser(userCredential.user, userData);
         _currentUser = user;
         return AuthResult(success: true, user: user);
       } catch (e) {
         print('Error fetching user data after login: $e');
-        // Even if we can't get the user data from Firestore, the auth was successful
-        // Return a basic user object with the information we have
-        return AuthResult(
-          success: true,
-          user: app_models.User(
-            id: userCredential.user!.uid,
-            email: userCredential.user!.email ?? '',
-            firstName: '',
-            lastName: '',
-            roleId: '',
-          ),
-        );
+        return AuthResult(success: false, error: 'Không thể tải thông tin người dùng');
       }
     } on firebase_auth.FirebaseAuthException catch (e) {
       print('Firebase Auth Exception during login: ${e.code} - ${e.message}');
@@ -514,5 +508,31 @@ class AuthService {
     final user = currentUser;
     // Kiểm tra roleId được thiết lập là 'teacher'
     return user?.roleId == 'teacher';
+  }
+
+  // Toggle user active status
+  Future<AuthResult> toggleUserActive(String userId, bool isActive) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        return AuthResult(success: false, error: 'No user is signed in');
+      }
+
+      // Update user's active status in Firestore
+      await _firestore.collection('users').doc(userId).update({
+        'isActive': isActive,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // If the current user is being deactivated, sign them out
+      if (userId == user.uid && !isActive) {
+        await signOut();
+      }
+
+      return AuthResult(success: true);
+    } catch (e) {
+      print('Error toggling user active status: $e');
+      return AuthResult(success: false, error: e.toString());
+    }
   }
 }

@@ -26,7 +26,27 @@ class FlashcardService {
   // Update an existing flashcard set
   Future<void> updateFlashcard(Flashcard flashcard) async {
     try {
-      await _flashcardsRef.doc(flashcard.id).update(flashcard.toMap());
+      // Lấy thông tin flashcard hiện tại
+      final currentDoc = await _flashcardsRef.doc(flashcard.id).get();
+      if (!currentDoc.exists) throw 'Bộ thẻ không tồn tại';
+      
+      final currentData = currentDoc.data() as Map<String, dynamic>;
+      final currentFlashcard = Flashcard.fromMap(currentData, currentDoc.id);
+      
+      // Kiểm tra xem có thay đổi gì không
+      bool hasChanges = 
+        currentFlashcard.title != flashcard.title ||
+        currentFlashcard.description != flashcard.description ||
+        currentFlashcard.isPublic != flashcard.isPublic;
+      
+      // Nếu có thay đổi, đặt lại trạng thái phê duyệt về pending
+      final updatedData = flashcard.toMap();
+      if (hasChanges) {
+        updatedData['approvalStatus'] = 'pending';
+        updatedData['rejectionReason'] = null;
+      }
+      
+      await _flashcardsRef.doc(flashcard.id).update(updatedData);
     } catch (e) {
       print('Error updating flashcard: $e');
       throw 'Không thể cập nhật bộ thẻ';

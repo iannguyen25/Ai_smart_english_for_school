@@ -156,9 +156,38 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
               ),
             ),
-            title: Text(
-              user.fullName,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    user.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (!user.isActive)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock, size: 16, color: Colors.red.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Đã khóa',
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,20 +195,34 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 const SizedBox(height: 4),
                 Text(user.email ?? 'email@example.com'),
                 const SizedBox(height: 4),
-                Text(
-                  user.roleId == 'admin'
-                      ? 'Quản trị viên'
-                      : user.roleId == 'teacher'
-                          ? 'Giáo viên'
-                          : 'Học sinh',
-                  style: TextStyle(
-                    color: user.roleId == 'admin'
-                        ? Colors.red
-                        : user.roleId == 'teacher'
-                            ? Colors.green
-                            : Colors.blue,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      user.roleId == 'admin'
+                          ? 'Quản trị viên'
+                          : user.roleId == 'teacher'
+                              ? 'Giáo viên'
+                              : 'Học sinh',
+                      style: TextStyle(
+                        color: user.roleId == 'admin'
+                            ? Colors.red
+                            : user.roleId == 'teacher'
+                                ? Colors.green
+                                : Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (!user.isActive) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '• Tài khoản bị khóa',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -223,11 +266,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Xóa', style: TextStyle(color: Colors.red)),
+              leading: Icon(
+                user.isActive ? Icons.lock : Icons.lock_open,
+                color: user.isActive ? Colors.red : Colors.green,
+              ),
+              title: Text(
+                user.isActive ? 'Khóa tài khoản' : 'Mở khóa tài khoản',
+                style: TextStyle(
+                  color: user.isActive ? Colors.red : Colors.green,
+                ),
+              ),
               onTap: () {
                 Get.back();
-                _deleteUser(user);
+                _toggleUserActive(user);
               },
             ),
             if (user.roleId != 'admin')
@@ -328,6 +379,58 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         Get.snackbar(
           'Lỗi',
           'Không thể cập nhật vai trò người dùng: ${e.toString()}',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleUserActive(User user) async {
+    final confirm = await Get.dialog<bool>(
+      AlertDialog(
+        title: Text(user.isActive ? 'Xác nhận khóa tài khoản' : 'Xác nhận mở khóa tài khoản'),
+        content: Text(
+          user.isActive
+              ? 'Bạn có chắc chắn muốn khóa tài khoản của ${user.fullName}?'
+              : 'Bạn có chắc chắn muốn mở khóa tài khoản của ${user.fullName}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            style: TextButton.styleFrom(
+              foregroundColor: user.isActive ? Colors.red : Colors.green,
+            ),
+            child: Text(user.isActive ? 'Khóa' : 'Mở khóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final result = await _authService.toggleUserActive(user.id!, !user.isActive);
+        if (result.success) {
+          Get.snackbar(
+            'Thành công',
+            user.isActive ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+          _loadUsers();
+        } else {
+          Get.snackbar(
+            'Lỗi',
+            result.error ?? 'Không thể thực hiện thao tác',
+            snackPosition: SnackPosition.BOTTOM,
+          );
+        }
+      } catch (e) {
+        Get.snackbar(
+          'Lỗi',
+          'Không thể thực hiện thao tác: ${e.toString()}',
           snackPosition: SnackPosition.BOTTOM,
         );
       }

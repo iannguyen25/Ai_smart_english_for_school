@@ -4,14 +4,17 @@ import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import 'package:diacritic/diacritic.dart';
+import 'unicode_utils.dart';
 
 class ChatGPTService {
+  // Singleton pattern
+  static final ChatGPTService _instance = ChatGPTService._internal();
+  factory ChatGPTService() => _instance;
+  ChatGPTService._internal();
+
   final String _baseUrl = 'https://api.cohere.ai/v1/chat';
   final _secureStorage = const FlutterSecureStorage();
   bool _hasShownQuotaError = false;
-  
-  ChatGPTService();
   
   String _getApiKey() {
     // Hardcode API key trực tiếp cho Cohere
@@ -29,8 +32,8 @@ class ChatGPTService {
       print('Original text before processing: $text');
       
       // Chuẩn hóa text trước khi gửi API
-      String normalizedText = removeDiacritics(text);
-      print('After removeDiacritics: $normalizedText');
+      String normalizedText = UnicodeUtils.normalizeVietnameseMarks(text);
+      print('After normalizeVietnameseMarks: $normalizedText');
       
       final response = await http.post(
         Uri.parse(_baseUrl),
@@ -53,7 +56,14 @@ class ChatGPTService {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         final result = data['text'] ?? text;
         print('Final processed text: $result');
-        return result;
+        
+        // Xử lý encoding cho kết quả trả về
+        String processedResult = result;
+        if (UnicodeUtils.hasEncodingIssues(processedResult)) {
+          processedResult = UnicodeUtils.normalizeVietnameseMarks(processedResult);
+        }
+        
+        return processedResult;
       } else {
         _handleApiError(response.statusCode, response.body);
         print('Error occurred, returning original text: $text');
@@ -128,7 +138,9 @@ class ChatGPTService {
             String answer = card['answer'] as String? ?? '';
             
             // Sửa lỗi encoding (nếu có)
-            answer = _fixVietnameseEncoding(answer);
+            if (UnicodeUtils.hasEncodingIssues(answer)) {
+              answer = UnicodeUtils.normalizeVietnameseMarks(answer);
+            }
             
             return {
               'question': card['question'] as String? ?? '',
@@ -238,9 +250,15 @@ class ChatGPTService {
             word = word[0].toUpperCase() + word.substring(1);
           }
           
+          // Xử lý encoding cho nghĩa tiếng Việt
+          String processedMeaning = meaning;
+          if (UnicodeUtils.hasEncodingIssues(processedMeaning)) {
+            processedMeaning = UnicodeUtils.normalizeVietnameseMarks(processedMeaning);
+          }
+          
           flashcards.add({
             'question': word,
-            'answer': meaning,
+            'answer': processedMeaning,
           });
         }
       }
@@ -263,9 +281,15 @@ class ChatGPTService {
           
           // Nếu dòng tiếp theo không phải là từ tiếng Anh, coi đó là nghĩa
           if (!englishWordRegex.hasMatch(nextLine)) {
+            // Xử lý encoding cho nghĩa tiếng Việt
+            String processedMeaning = nextLine;
+            if (UnicodeUtils.hasEncodingIssues(processedMeaning)) {
+              processedMeaning = UnicodeUtils.normalizeVietnameseMarks(processedMeaning);
+            }
+            
             flashcards.add({
               'question': word,
-              'answer': nextLine,
+              'answer': processedMeaning,
             });
           }
         }
@@ -273,12 +297,5 @@ class ChatGPTService {
     }
     
     return flashcards;
-  }
-  
-  String _fixVietnameseEncoding(String text) {
-    if (text.isEmpty) return text;
-    
-    // Sử dụng package diacritic để xử lý text tiếng Việt
-    return removeDiacritics(text);
   }
 }

@@ -8,6 +8,8 @@ import '../../services/flashcard_service.dart';
 import '../../services/analytics_service.dart';
 import 'create_edit_flashcard_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../screens/exercises/fill_in_the_blank_game.dart';
+import '../../screens/exercises/matching_game.dart';
 
 class FlashcardDetailScreen extends StatefulWidget {
   final String flashcardId;
@@ -471,6 +473,61 @@ class _FlashcardDetailScreenState extends State<FlashcardDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Thêm các nút trò chơi
+                if (_items.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            // Lọc các flashcard items phù hợp cho trò chơi điền từ
+                            final validItems = _items.where((item) => 
+                              item.type == FlashcardItemType.textToText || 
+                              item.type == FlashcardItemType.imageToText
+                            ).toList();
+
+                            if (validItems.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Không có từ vựng phù hợp cho trò chơi này'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              return;
+                            }
+
+                            Get.to(() => FillInTheBlankGame(
+                              items: validItems,
+                            ));
+                          },
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Điền từ'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Get.to(() => MatchingGame(
+                              items: _items,
+                            ));
+                          },
+                          icon: const Icon(Icons.link),
+                          label: const Text('Nối từ'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Row(
                   children: [
                     Container(

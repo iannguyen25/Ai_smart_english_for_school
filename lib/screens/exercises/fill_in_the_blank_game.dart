@@ -5,10 +5,12 @@ import '../../models/flashcard_item.dart';
 
 class FillInTheBlankGame extends StatefulWidget {
   final List<FlashcardItem> items;
+  final int maxItems;
 
   const FillInTheBlankGame({
     Key? key,
     required this.items,
+    this.maxItems = 10, // Mặc định 10 câu hỏi
   }) : super(key: key);
 
   @override
@@ -22,13 +24,56 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
   bool _isCorrect = false;
   int _score = 0;
   List<bool> _answered = [];
+  List<FlashcardItem> _selectedItems = [];
+  final TextEditingController _answerController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _answered = List.filled(widget.items.length, false);
-    // Trộn ngẫu nhiên các câu hỏi
-    widget.items.shuffle();
+    _initializeGame();
+  }
+
+  @override
+  void dispose() {
+    _answerController.dispose();
+    super.dispose();
+  }
+
+  List<FlashcardItem> _getRandomItems(List<FlashcardItem> items) {
+    // Lọc bỏ các item không hợp lệ
+    final validItems = items.where((item) => 
+      item.type == FlashcardItemType.textToText || 
+      item.type == FlashcardItemType.imageToText
+    ).toList();
+
+    // Nếu số lượng item hợp lệ ít hơn hoặc bằng maxItems, trả về tất cả
+    if (validItems.length <= widget.maxItems) {
+      return List.from(validItems);
+    }
+
+    // Tạo một bản sao của danh sách để tránh ảnh hưởng đến dữ liệu gốc
+    final shuffledItems = List<FlashcardItem>.from(validItems);
+    shuffledItems.shuffle();
+
+    // Lấy ngẫu nhiên maxItems thẻ
+    return shuffledItems.take(widget.maxItems).toList();
+  }
+
+  void _initializeGame() {
+    // Lấy ngẫu nhiên các thẻ
+    _selectedItems = _getRandomItems(widget.items);
+    
+    // Trộn ngẫu nhiên
+    _selectedItems.shuffle();
+    
+    // Khởi tạo trạng thái đã trả lời
+    _answered = List.filled(_selectedItems.length, false);
+    
+    _currentIndex = 0;
+    _score = 0;
+    _userAnswer = '';
+    _showResult = false;
+    _answerController.clear(); // Clear input khi khởi tạo lại game
   }
 
   void _checkAnswer() {
@@ -37,7 +82,7 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
     setState(() {
       _showResult = true;
       _isCorrect = _userAnswer.trim().toLowerCase() == 
-          widget.items[_currentIndex].answer.toLowerCase();
+          _selectedItems[_currentIndex].answer.toLowerCase();
       
       if (_isCorrect && !_answered[_currentIndex]) {
         _score += 10;
@@ -47,11 +92,12 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
   }
 
   void _nextQuestion() {
-    if (_currentIndex < widget.items.length - 1) {
+    if (_currentIndex < _selectedItems.length - 1) {
       setState(() {
         _currentIndex++;
         _userAnswer = '';
         _showResult = false;
+        _answerController.clear(); // Clear input khi chuyển câu
       });
     } else {
       _showFinalScore();
@@ -82,7 +128,7 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Bạn đã trả lời đúng ${_answered.where((a) => a).length}/${widget.items.length} câu',
+              'Bạn đã trả lời đúng ${_answered.where((a) => a).length}/${_selectedItems.length} câu',
             ),
           ],
         ),
@@ -97,12 +143,7 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              setState(() {
-                _currentIndex = 0;
-                _score = 0;
-                _answered = List.filled(widget.items.length, false);
-                widget.items.shuffle();
-              });
+              _initializeGame();
             },
             child: const Text('Chơi lại'),
           ),
@@ -113,7 +154,18 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
 
   @override
   Widget build(BuildContext context) {
-    final currentItem = widget.items[_currentIndex];
+    if (_selectedItems.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Điền từ'),
+        ),
+        body: const Center(
+          child: Text('Không có từ vựng phù hợp cho trò chơi này'),
+        ),
+      );
+    }
+
+    final currentItem = _selectedItems[_currentIndex];
     
     return Scaffold(
       appBar: AppBar(
@@ -140,14 +192,14 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
           children: [
             // Progress indicator
             LinearProgressIndicator(
-              value: (_currentIndex + 1) / widget.items.length,
+              value: (_currentIndex + 1) / _selectedItems.length,
               backgroundColor: Colors.grey.shade200,
             ),
             const SizedBox(height: 16),
             
             // Question counter
             Text(
-              'Câu ${_currentIndex + 1}/${widget.items.length}',
+              'Câu ${_currentIndex + 1}/${_selectedItems.length}',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
@@ -161,14 +213,14 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
                 child: Column(
                   children: [
                     if (currentItem.type == FlashcardItemType.textToText) ...[
-                    Text(
-                      currentItem.question,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                      Text(
+                        currentItem.question,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
                     ] else if (currentItem.questionImage != null) ...[
                       Container(
                         constraints: const BoxConstraints(
@@ -178,7 +230,7 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
-                        currentItem.questionImage!,
+                            currentItem.questionImage!,
                             fit: BoxFit.contain,
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
@@ -208,7 +260,7 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
                             fontStyle: FontStyle.italic,
                           ),
                           textAlign: TextAlign.center,
-                      ),
+                        ),
                       ],
                     ],
                   ],
@@ -219,6 +271,7 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
             
             // Answer input
             TextField(
+              controller: _answerController,
               decoration: InputDecoration(
                 labelText: 'Nhập câu trả lời',
                 border: OutlineInputBorder(),
