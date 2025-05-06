@@ -55,7 +55,7 @@ class _AIChatTabState extends State<AIChatTab> {
     setState(() {
       _messages.add(
         ChatMessage(
-          text: '$greeting\n\nHôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh',
+          text: '$greeting\n\nHôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh\n5. Tư vấn khóa học\n6. Hỗ trợ trung tâm',
           isUser: false,
         ),
       );
@@ -86,8 +86,16 @@ class _AIChatTabState extends State<AIChatTab> {
                 normalizedText.contains('bao') ||
                 normalizedText.contains('reading')) {
         _setMainTopic('reading');
+      } else if (text.contains('5') || 
+                normalizedText.contains('tu van') ||
+                normalizedText.contains('khoa hoc')) {
+        _setMainTopic('course-advice');
+      } else if (text.contains('6') || 
+                normalizedText.contains('ho tro') ||
+                normalizedText.contains('trung tam')) {
+        _setMainTopic('center-support');
       } else {
-        _sendBotMessage('Xin lỗi, tôi không hiểu lựa chọn của bạn. Vui lòng chọn một chủ đề:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh');
+        _sendBotMessage('Xin lỗi, tôi không hiểu lựa chọn của bạn. Vui lòng chọn một chủ đề:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh\n5. Tư vấn khóa học\n6. Hỗ trợ trung tâm');
       }
       return;
     }
@@ -109,7 +117,7 @@ class _AIChatTabState extends State<AIChatTab> {
         text.toLowerCase().contains('menu') || 
         text.toLowerCase().contains('trở về')) {
       _resetTopics();
-      _sendBotMessage('Hôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh');
+      _sendBotMessage('Hôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh\n5. Tư vấn khóa học\n6. Hỗ trợ trung tâm');
       return;
     }
     
@@ -138,6 +146,55 @@ class _AIChatTabState extends State<AIChatTab> {
         break;
       case 'reading':
         _sendBotMessage('Bạn muốn đọc bài về chủ đề nào:\n\n1. Văn hóa\n2. Công nghệ\n3. Thể thao\n4. Giáo dục\n5. Môi trường\n6. Khoa học');
+        break;
+      case 'course-advice':
+        _sendBotMessage('''Thông tin về Trường Anh ngữ quốc tế PoPoDoo Định Công (PoPoDoo Smart English):
+
+📍 Thông tin cơ bản:
+- Địa chỉ: Số 85, Đường Trần Nguyên Đán, Phường Định Công, Quận Hoàng Mai, Hà Nội
+- Độ tuổi tuyển sinh: Từ 3-15 tuổi
+- Học phí: Từ 1.650.000 VNĐ/tháng
+
+🎯 Chương trình đào tạo:
+1. Tiếng Anh mầm non (3-5 tuổi)
+2. Tiếng Anh tiểu học (6-10 tuổi)
+3. Tiếng Anh thiếu niên (11-15 tuổi)
+
+🌟 Điểm nổi bật:
+- Hơn 10 năm kinh nghiệm giảng dạy tiếng Anh cho trẻ em
+- Chương trình theo tiêu chuẩn Cambridge
+- Môi trường học tập đa phương tiện "Hear, Say, See, Do"
+- Đội ngũ giáo viên Việt Nam và nước ngoài đạt chuẩn sư phạm
+- Cơ sở vật chất hiện đại, phù hợp với trẻ em
+
+Bạn muốn tìm hiểu thêm về khóa học nào? Hoặc bạn có thể cho tôi biết:
+- Độ tuổi của học viên
+- Mục tiêu học tập
+- Thời gian học mong muốn
+để tôi có thể tư vấn khóa học phù hợp.''');
+        setState(() {
+          _waitingForUserInput = true;
+        });
+        break;
+      case 'center-support':
+        _sendBotMessage('''Thông tin liên hệ và hỗ trợ:
+
+1. Thông tin chung
+2. Lịch học và học phí
+3. Đăng ký học thử
+4. Tư vấn lộ trình học
+5. Liên hệ trực tiếp
+
+📍 Thông tin liên hệ:
+- Địa chỉ: Số 85, Đường Trần Nguyên Đán, Phường Định Công, Quận Hoàng Mai, Hà Nội
+- Học phí: Từ 1.650.000 VNĐ/tháng
+- Độ tuổi: 3-15 tuổi
+- Chương trình: Theo tiêu chuẩn Cambridge
+
+Vui lòng chọn mục bạn cần hỗ trợ hoặc nhập câu hỏi cụ thể.''');
+        setState(() {
+          _waitingForUserInput = true;
+        });
         break;
     }
   }
@@ -238,12 +295,19 @@ class _AIChatTabState extends State<AIChatTab> {
   }
   
   void _processUserInput(String text) {
-    setState(() {
-      _waitingForUserInput = false;
-    });
+    // Chỉ reset waiting state cho các chủ đề không phải tư vấn/hỗ trợ
+    if (_currentTopic != 'course-advice' && _currentTopic != 'center-support') {
+      setState(() {
+        _waitingForUserInput = false;
+      });
+    }
     
     if (_currentTopic == 'translation') {
       _getTranslation(text);
+    } else if (_currentTopic == 'course-advice') {
+      _getCourseAdvice(text);
+    } else if (_currentTopic == 'center-support') {
+      _getCenterSupport(text);
     } else {
       _callChatGPTAPI(text);
     }
@@ -251,6 +315,46 @@ class _AIChatTabState extends State<AIChatTab> {
   
   void _getTranslation(String text) {
     _callChatGPTAPI("Dịch từ sau sang tiếng Việt, cho biết loại từ (N, V, ADJ...) và 2 ví dụ sử dụng khác nhau: \"$text\"");
+  }
+  
+  void _getCourseAdvice(String text) {
+    String prompt = '''Bạn là nhân viên tư vấn khóa học của Trường Anh ngữ quốc tế PoPoDoo Định Công. 
+    Dựa trên thông tin sau:
+    - Địa chỉ: Số 85, Đường Trần Nguyên Đán, Phường Định Công, Quận Hoàng Mai, Hà Nội
+    - Học phí: Từ 1.650.000 VNĐ/tháng
+    - Độ tuổi: 3-15 tuổi
+    
+    Chương trình đào tạo:
+    1. Tiếng Anh mầm non (3-5 tuổi)
+    2. Tiếng Anh tiểu học (6-10 tuổi)
+    3. Tiếng Anh thiếu niên (11-15 tuổi)
+    
+    Điểm nổi bật:
+    - Hơn 10 năm kinh nghiệm
+    - Chương trình Cambridge
+    - Môi trường học tập đa phương tiện
+    - Giáo viên Việt Nam và nước ngoài
+    - Cơ sở vật chất hiện đại
+    
+    Hãy tư vấn khóa học phù hợp dựa trên yêu cầu của học viên: "$text"
+    Trả lời ngắn gọn, tập trung vào khóa học phù hợp nhất và lý do chọn khóa học đó.''';
+    
+    _callChatGPTAPI(prompt);
+  }
+
+  void _getCenterSupport(String text) {
+    String prompt = '''Bạn là nhân viên hỗ trợ của Trường Anh ngữ quốc tế PoPoDoo Định Công.
+    Dựa trên thông tin sau:
+    - Địa chỉ: Số 85, Đường Trần Nguyên Đán, Phường Định Công, Quận Hoàng Mai, Hà Nội
+    - Học phí: Từ 1.650.000 VNĐ/tháng
+    - Độ tuổi: 3-15 tuổi
+    - Chương trình: Theo tiêu chuẩn Cambridge
+    - Điểm nổi bật: Hơn 10 năm kinh nghiệm, giáo viên đạt chuẩn, cơ sở vật chất hiện đại
+    
+    Hãy trả lời câu hỏi của học viên: "$text"
+    Trả lời ngắn gọn, chính xác và hữu ích.''';
+    
+    _callChatGPTAPI(prompt);
   }
   
   void _callChatGPTWithTopic() {
@@ -315,6 +419,11 @@ class _AIChatTabState extends State<AIChatTab> {
       
       // Hiển thị kết quả
       _sendBotMessage(response);
+      
+      // Set waiting state based on current topic
+      setState(() {
+        _waitingForUserInput = _currentTopic == 'course-advice' || _currentTopic == 'center-support';
+      });
     } catch (e) {
       print("Error calling ChatGPT API: $e");
       _sendBotMessage("Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.");
@@ -373,7 +482,7 @@ class _AIChatTabState extends State<AIChatTab> {
                 });
               } else if (value == 'menu') {
                 _resetTopics();
-                _sendBotMessage('Hôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh');
+                _sendBotMessage('Hôm nay bạn muốn trò chuyện về vấn đề gì:\n\n1. Từ vựng\n2. Ngữ pháp\n3. Dịch thuật\n4. Đọc một câu chuyện/bài báo tiếng Anh\n5. Tư vấn khóa học\n6. Hỗ trợ trung tâm');
               }
             },
             itemBuilder: (context) => [
