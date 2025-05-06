@@ -61,6 +61,8 @@ class Discussion extends BaseModel {
   final bool isResolved;         // Đánh dấu đã giải quyết (cho câu hỏi)
   final bool isPinned;           // Ghim thảo luận
   final Map<String, dynamic>? metadata; // Dữ liệu bổ sung
+  final String? userName;        // Tên người dùng
+  final String? userAvatar;      // Avatar người dùng
 
   Discussion({
     String? id,
@@ -77,6 +79,8 @@ class Discussion extends BaseModel {
     this.isResolved = false,
     this.isPinned = false,
     this.metadata,
+    this.userName,
+    this.userAvatar,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) : super(
@@ -101,6 +105,8 @@ class Discussion extends BaseModel {
       isResolved: map['isResolved'] ?? false,
       isPinned: map['isPinned'] ?? false,
       metadata: map['metadata'],
+      userName: map['userName'],
+      userAvatar: map['userAvatar'],
       createdAt: map['createdAt'],
       updatedAt: map['updatedAt'] ?? map['createdAt'],
     );
@@ -158,6 +164,8 @@ class Discussion extends BaseModel {
       'isResolved': isResolved,
       'isPinned': isPinned,
       'metadata': metadata,
+      'userName': userName,
+      'userAvatar': userAvatar,
       'createdAt': createdAt ?? Timestamp.now(),
       'updatedAt': updatedAt ?? Timestamp.now(),
     };
@@ -179,6 +187,8 @@ class Discussion extends BaseModel {
     bool? isResolved,
     bool? isPinned,
     Map<String, dynamic>? metadata,
+    String? userName,
+    String? userAvatar,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) {
@@ -197,6 +207,8 @@ class Discussion extends BaseModel {
       isResolved: isResolved ?? this.isResolved,
       isPinned: isPinned ?? this.isPinned,
       metadata: metadata ?? this.metadata,
+      userName: userName ?? this.userName,
+      userAvatar: userAvatar ?? this.userAvatar,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

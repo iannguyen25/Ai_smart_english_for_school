@@ -305,6 +305,17 @@ service cloud.firestore {
         isOwner(resource.data.userId) ||
         (resource.data.classroomId != null && isTeacherOfClass(resource.data.classroomId))
       );
+
+      // Cho phép truy vấn replies (discussions có parentId)
+      allow list: if isAuthenticated() && (
+        request.query.limit <= 50 && (
+          resource.data.parentId != null || 
+          resource.data.classroomId != null && (
+            isTeacherOfClass(resource.data.classroomId) ||
+            isStudentInClassroom(resource.data.classroomId)
+          )
+        )
+      );
     }
 		
     match /flashcards/{userId}/{flashcardId}/{fileName} {
@@ -330,6 +341,15 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && (
         request.auth.uid == resource.data.userId ||
         isAdmin()
+      );
+    }
+
+    // User tokens collection for FCM
+    match /user_tokens/{tokenId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.userId == null
       );
     }
   }

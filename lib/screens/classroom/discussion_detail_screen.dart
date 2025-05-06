@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/discussion.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../../services/user_service.dart';
 import '../../models/app_user.dart';
+import 'dart:developer' as dev;
+import 'dart:async';
 
 class DiscussionDetailScreen extends StatefulWidget {
   final String classroomId;
@@ -29,56 +32,104 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
   final _userService = UserService();
   final _replyController = TextEditingController();
   final _scrollController = ScrollController();
+  final _firestore = FirebaseFirestore.instance;
 
   List<Discussion> _replies = [];
   Map<String, User> _users = {};
   bool _isLoading = true;
   bool _isSending = false;
+  StreamSubscription? _repliesSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadReplies();
+    // Enable debug prints
+    debugPrint = (String? message, {int? wrapWidth}) {
+      dev.log(message ?? '', name: 'DiscussionDetail');
+    };
+    _setupRepliesStream();
   }
 
   @override
   void dispose() {
     _replyController.dispose();
     _scrollController.dispose();
+    _repliesSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadReplies() async {
-    try {
-      setState(() => _isLoading = true);
-
-      // Load tất cả replies của discussion này
-      final replies = await Discussion.getReplies(
-        widget.discussion.id!,
-        classroomId: widget.classroomId,
-      );
+  void _setupRepliesStream() {
+    debugPrint('🔄 Setting up replies stream...');
+    debugPrint('📝 Discussion ID: ${widget.discussion.id}');
+    
+    _repliesSubscription = _firestore
+        .collection('discussions')
+        .where('parentId', isEqualTo: widget.discussion.id)
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .listen((snapshot) async {
+      debugPrint('📥 Received ${snapshot.docChanges.length} changes');
       
-      // Load thông tin người dùng
-      final userIds = {
-        widget.discussion.userId,
-        ...replies.map((r) => r.userId),
-      };
+      for (var change in snapshot.docChanges) {
+        debugPrint('📝 Change type: ${change.type} for doc: ${change.doc.id}');
+        
+        switch (change.type) {
+          case DocumentChangeType.added:
+            final reply = Discussion.fromMap(change.doc.data()!, change.doc.id);
+            if (!_replies.any((r) => r.id == reply.id)) {
+              setState(() {
+                _replies.add(reply);
+                _replies.sort((a, b) => 
+                  (a.createdAt ?? Timestamp.now())
+                    .compareTo(b.createdAt ?? Timestamp.now()));
+              });
+              debugPrint('✅ Added new reply: ${reply.id}');
+            }
+            break;
+            
+          case DocumentChangeType.modified:
+            final reply = Discussion.fromMap(change.doc.data()!, change.doc.id);
+            setState(() {
+              final index = _replies.indexWhere((r) => r.id == reply.id);
+              if (index != -1) {
+                _replies[index] = reply;
+                debugPrint('✅ Updated reply: ${reply.id}');
+              }
+            });
+            break;
+            
+          case DocumentChangeType.removed:
+            setState(() {
+              _replies.removeWhere((r) => r.id == change.doc.id);
+              debugPrint('✅ Removed reply: ${change.doc.id}');
+            });
+            break;
+        }
+      }
 
-      final users = await Future.wait(
-        userIds.map((uid) => _userService.getUserById(uid))
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _replies = replies;
-        _users = Map.fromEntries(
-          users.where((u) => u != null).map((u) => MapEntry(u!.id!, u))
+      // Load user info for new replies
+      final newUserIds = snapshot.docChanges
+          .where((change) => change.type == DocumentChangeType.added)
+          .map((change) => change.doc.data()!['userId'] as String)
+          .toSet();
+      
+      if (newUserIds.isNotEmpty) {
+        debugPrint('🔄 Loading info for ${newUserIds.length} new users');
+        final users = await Future.wait(
+          newUserIds.map((uid) => _userService.getUserById(uid))
         );
-        _isLoading = false;
-      });
+        
+        setState(() {
+          _users.addAll(
+            Map.fromEntries(
+              users.where((u) => u != null).map((u) => MapEntry(u!.id!, u))
+            )
+          );
+        });
+        debugPrint('✅ Updated user info');
+      }
 
-      // Scroll to bottom after loading
+      // Scroll to bottom after updates
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -86,39 +137,32 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
             duration: Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
+          debugPrint('✅ Scrolled to bottom');
         }
       });
-    } catch (e) {
-      print('Error loading replies: $e');
-      if (!mounted) return;
-      
-      setState(() => _isLoading = false);
-      
-      if (e.toString().contains('requires an index')) {
-        Get.snackbar(
-          'Thông báo',
-          'Hệ thống đang cập nhật. Vui lòng thử lại sau vài phút.',
-          snackPosition: SnackPosition.BOTTOM,
-          duration: Duration(seconds: 5),
-        );
-      } else {
-        Get.snackbar(
-          'Lỗi',
-          'Không thể tải tin nhắn: $e',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      }
-    }
+    }, onError: (error) {
+      debugPrint('❌ Error in replies stream: $error');
+      Get.snackbar(
+        'Lỗi',
+        'Không thể tải tin nhắn: $error',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    });
+
+    setState(() => _isLoading = false);
   }
 
   Future<void> _sendReply() async {
     final content = _replyController.text.trim();
     if (content.isEmpty) return;
 
+    debugPrint('🔄 Starting to send reply...');
+    debugPrint('📝 Content: $content');
     setState(() => _isSending = true);
 
     try {
       // Tạo reply mới
+      debugPrint('🔄 Creating new reply...');
       final newReply = await Discussion.create(
         userId: _auth.currentUser?.uid ?? '',
         content: content,
@@ -128,24 +172,15 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
       );
 
       if (newReply != null) {
-        setState(() {
-          _replies.add(newReply);
-          _replyController.clear();
-        });
-
-        // Scroll to bottom after sending
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          }
-        });
+        debugPrint('✅ Reply created successfully');
+        debugPrint('📝 New reply ID: ${newReply.id}');
+        _replyController.clear();
+        debugPrint('✅ Cleared reply input');
+      } else {
+        debugPrint('❌ Failed to create reply');
       }
     } catch (e) {
-      print('Error sending reply: $e');
+      debugPrint('❌ Error sending reply: $e');
       Get.snackbar(
         'Lỗi',
         'Không thể gửi tin nhắn: $e',

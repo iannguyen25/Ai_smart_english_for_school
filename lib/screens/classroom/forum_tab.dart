@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/discussion.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'discussion_detail_screen.dart';
+import '../../services/discussion_service.dart';
 
 class ForumTab extends StatefulWidget {
   final String classroomId;
@@ -23,68 +27,340 @@ class ForumTab extends StatefulWidget {
 
 class _ForumTabState extends State<ForumTab> {
   final _auth = auth.FirebaseAuth.instance;
+  final _discussionService = DiscussionService();
   
   List<Discussion> _discussions = [];
   bool _isLoading = true;
   String? _errorMessage;
+  StreamSubscription? _discussionSubscription;
   
   @override
   void initState() {
     super.initState();
+    // Enable debug prints
+    debugPrint = (String? message, {int? wrapWidth}) {
+      dev.log(message ?? '', name: 'ForumTab');
+    };
     _loadDiscussions();
+    _subscribeToNotifications();
   }
   
-  // Tải dữ liệu diễn đàn
+  // Load discussions
   Future<void> _loadDiscussions() async {
     try {
-      setState(() => _isLoading = true);
-      
-      // Giả lập tải dữ liệu diễn đàn
-      await Future.delayed(Duration(seconds: 1));
-      
-      final discussions = [
-        Discussion(
-          id: '1',
-          userId: 'user1',
-          content: 'Thắc mắc về bài tập tuần 1?',
-          type: DiscussionType.question,
-          isPinned: true,
-          createdAt: Timestamp.fromDate(DateTime.now().subtract(Duration(days: 2))),
-        ),
-        Discussion(
-          id: '2',
-          userId: 'user2',
-          content: 'Mọi người chia sẻ tài liệu tham khảo được không?',
-          type: DiscussionType.question,
-          createdAt: Timestamp.fromDate(DateTime.now().subtract(Duration(days: 1))),
-        ),
-        Discussion(
-          id: '3',
-          userId: 'user3',
-          content: 'Thông báo: Lịch học tuần sau sẽ thay đổi',
-          type: DiscussionType.comment,
-          isPinned: true,
-          createdAt: Timestamp.fromDate(DateTime.now().subtract(Duration(hours: 5))),
-        ),
-      ];
-      
-      if (!mounted) return;
+      debugPrint('🔄 Starting to load discussions...');
+      setState(() {
+        _isLoading = true;
+      });
 
-      setState(() {
-        _discussions = discussions;
-        _isLoading = false;
-        _errorMessage = null;
-      });
+      // Hủy subscription cũ nếu có
+      if (_discussionSubscription != null) {
+        debugPrint('🔄 Cancelling old subscription...');
+        await _discussionSubscription?.cancel();
+      }
+
+      debugPrint('🔄 Creating new subscription...');
+      // Tạo subscription mới
+      _discussionSubscription = _discussionService
+          .getClassroomDiscussionsStream(widget.classroomId)
+          .listen(
+        (discussions) {
+          debugPrint('📥 Received ${discussions.length} discussions from stream');
+          debugPrint('📝 First discussion: ${discussions.isNotEmpty ? discussions.first.content : "No discussions"}');
+          
+          if (mounted) {
+            setState(() {
+              _discussions = discussions;
+              _isLoading = false;
+              _errorMessage = null;
+            });
+            debugPrint('✅ Updated UI with new discussions');
+          } else {
+            debugPrint('⚠️ Widget not mounted, skipping UI update');
+          }
+        },
+        onError: (error) {
+          debugPrint('❌ Error in discussion stream: $error');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = error.toString();
+            });
+            Get.snackbar(
+              'Lỗi',
+              'Không thể tải danh sách thảo luận',
+              snackPosition: SnackPosition.BOTTOM,
+            );
+          }
+        },
+      );
+      debugPrint('✅ Successfully set up discussion stream');
     } catch (e) {
-      if (!mounted) return;
-      
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
-      
-      print('Error loading discussions: $e');
+      debugPrint('❌ Error setting up discussion stream: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+        Get.snackbar(
+          'Lỗi',
+          'Không thể tải danh sách thảo luận',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
     }
+  }
+  
+  // Xóa một chủ đề thảo luận
+  Future<void> _deleteDiscussion(Discussion discussion) async {
+    try {
+      dev.log('Deleting discussion...', name: 'ForumTab');
+      dev.log('Discussion ID: ${discussion.id}', name: 'ForumTab');
+      
+      await _discussionService.deleteDiscussion(discussion.id!);
+      
+      dev.log('Discussion deleted successfully', name: 'ForumTab');
+      Get.snackbar(
+        'Thành công',
+        'Đã xóa chủ đề thảo luận',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      dev.log('Error deleting discussion: $e', name: 'ForumTab', error: e);
+      Get.snackbar(
+        'Lỗi',
+        'Không thể xóa chủ đề thảo luận: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  // Hiển thị hộp thoại tạo chủ đề thảo luận
+  void _showCreateDiscussionDialog() {
+    final contentController = TextEditingController();
+    DiscussionType selectedType = DiscussionType.question;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Tạo chủ đề thảo luận'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Loại thảo luận
+              DropdownButtonFormField<DiscussionType>(
+                value: selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Loại thảo luận',
+                ),
+                items: DiscussionType.values.map((type) => DropdownMenuItem(
+                  value: type,
+                  child: Text(type.label),
+                )).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      selectedType = value;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              // Nội dung
+              TextField(
+                controller: contentController,
+                decoration: const InputDecoration(
+                  labelText: 'Nội dung',
+                  hintText: 'Nhập nội dung thảo luận',
+                ),
+                maxLines: 5,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (contentController.text.trim().isEmpty) {
+                  Get.snackbar(
+                    'Lỗi',
+                    'Vui lòng nhập nội dung thảo luận',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                  return;
+                }
+                
+                try {
+                  await _createDiscussion(contentController.text.trim(), selectedType);
+                } catch (e) {
+                  dev.log('Error creating discussion: $e', name: 'ForumTab', error: e);
+                  Get.snackbar(
+                    'Lỗi',
+                    'Không thể tạo chủ đề thảo luận: $e',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
+              },
+              child: const Text('Tạo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Hiển thị hộp thoại chỉnh sửa chủ đề thảo luận
+  void _showEditDiscussionDialog(Discussion discussion) {
+    final contentController = TextEditingController(text: discussion.content);
+    DiscussionType selectedType = discussion.type;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Chỉnh sửa chủ đề thảo luận'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Loại thảo luận
+              DropdownButtonFormField<DiscussionType>(
+                value: selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Loại thảo luận',
+                ),
+                items: DiscussionType.values.map((type) => DropdownMenuItem(
+                  value: type,
+                  child: Text(type.label),
+                )).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      selectedType = value;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              // Nội dung
+              TextField(
+                controller: contentController,
+                decoration: const InputDecoration(
+                  labelText: 'Nội dung',
+                  hintText: 'Nhập nội dung thảo luận',
+                ),
+                maxLines: 5,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (contentController.text.trim().isEmpty) {
+                  Get.snackbar(
+                    'Lỗi',
+                    'Vui lòng nhập nội dung thảo luận',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                  return;
+                }
+                
+                try {
+                  await _updateDiscussion(discussion, contentController.text.trim(), selectedType);
+                } catch (e) {
+                  dev.log('Error updating discussion: $e', name: 'ForumTab', error: e);
+                  Get.snackbar(
+                    'Lỗi',
+                    'Không thể cập nhật chủ đề thảo luận: $e',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
+              },
+              child: const Text('Cập nhật'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Hiển thị menu tùy chọn cho một chủ đề thảo luận
+  void _showDiscussionOptions(Discussion discussion) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.isTeacher || discussion.userId == _auth.currentUser?.uid)
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Chỉnh sửa'),
+              onTap: () {
+                Navigator.pop(context);
+                _showEditDiscussionDialog(discussion);
+              },
+            ),
+          if (widget.isTeacher || discussion.userId == _auth.currentUser?.uid)
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Xóa', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Xác nhận xóa'),
+                    content: const Text('Bạn có chắc chắn muốn xóa chủ đề thảo luận này?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Hủy'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _deleteDiscussion(discussion);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        child: const Text('Xóa'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          if (widget.isTeacher)
+            ListTile(
+              leading: Icon(
+                discussion.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                color: discussion.isPinned ? Colors.blue : null,
+              ),
+              title: Text(discussion.isPinned ? 'Bỏ ghim' : 'Ghim lên đầu'),
+              onTap: () async {
+                try {
+                  await _togglePinDiscussion(discussion);
+                } catch (e) {
+                  dev.log('Error toggling pin: $e', name: 'ForumTab', error: e);
+                  Get.snackbar(
+                    'Lỗi',
+                    'Không thể thay đổi trạng thái ghim: $e',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
+              },
+            ),
+        ],
+      ),
+    );
   }
   
   @override
@@ -415,93 +691,120 @@ class _ForumTabState extends State<ForumTab> {
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
-  
-  // Hiển thị hộp thoại tạo chủ đề thảo luận
-  void _showCreateDiscussionDialog() {
-    final contentController = TextEditingController();
-    DiscussionType selectedType = DiscussionType.question;
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Tạo chủ đề thảo luận'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Loại thảo luận
-              DropdownButtonFormField<DiscussionType>(
-                value: selectedType,
-                decoration: const InputDecoration(
-                  labelText: 'Loại thảo luận',
-                ),
-                items: DiscussionType.values.map((type) => DropdownMenuItem(
-                  value: type,
-                  child: Text(type.label),
-                )).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      selectedType = value;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              // Nội dung
-              TextField(
-                controller: contentController,
-                decoration: const InputDecoration(
-                  labelText: 'Nội dung',
-                  hintText: 'Nhập nội dung thảo luận',
-                ),
-                maxLines: 5,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (contentController.text.trim().isEmpty) {
-                  Get.snackbar(
-                    'Lỗi',
-                    'Vui lòng nhập nội dung thảo luận',
-                    snackPosition: SnackPosition.BOTTOM,
-                  );
-                  return;
-                }
-                
-                // Thêm thảo luận mới vào danh sách
-                final newDiscussion = Discussion(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  userId: _auth.currentUser?.uid ?? 'unknown',
-                  content: contentController.text.trim(),
-                  type: selectedType,
-                  createdAt: Timestamp.now(),
-                );
-                
-                if (!mounted) return;
-                
-                setState(() {
-                  _discussions.insert(0, newDiscussion);
-                });
-                
-                Navigator.pop(context);
-                Get.snackbar(
-                  'Thành công',
-                  'Đã tạo chủ đề thảo luận mới',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-              },
-              child: const Text('Tạo'),
-            ),
-          ],
-        ),
-      ),
-    );
+
+  Future<void> _subscribeToNotifications() async {
+    try {
+      await _discussionService.subscribeToClassroom(widget.classroomId);
+    } catch (e) {
+      dev.log('Error subscribing to notifications: $e', name: 'ForumTab', error: e);
+    }
+  }
+
+  @override
+  void dispose() {
+    dev.log('Disposing ForumTab...', name: 'ForumTab');
+    dev.log('Cancelling discussion subscription...', name: 'ForumTab');
+    _discussionSubscription?.cancel();
+    _discussionService.dispose();
+    _unsubscribeFromNotifications();
+    super.dispose();
+    dev.log('ForumTab disposed', name: 'ForumTab');
+  }
+
+  Future<void> _unsubscribeFromNotifications() async {
+    try {
+      await _discussionService.unsubscribeFromClassroom(widget.classroomId);
+    } catch (e) {
+      dev.log('Error unsubscribing from notifications: $e', name: 'ForumTab', error: e);
+    }
+  }
+
+  Future<void> _createDiscussion(String content, DiscussionType type) async {
+    try {
+      dev.log('Creating new discussion...', name: 'ForumTab');
+      dev.log('Content: $content', name: 'ForumTab');
+      dev.log('Type: $type', name: 'ForumTab');
+      
+      final newDiscussion = await _discussionService.createDiscussion(
+        userId: _auth.currentUser?.uid ?? '',
+        classroomId: widget.classroomId,
+        content: content,
+        type: type,
+      );
+      
+      dev.log('Discussion created successfully', name: 'ForumTab');
+      dev.log('New discussion ID: ${newDiscussion.id}', name: 'ForumTab');
+      
+      Get.snackbar(
+        'Thành công',
+        'Đã tạo chủ đề thảo luận mới',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      dev.log('Error creating discussion: $e', name: 'ForumTab', error: e);
+      Get.snackbar(
+        'Lỗi',
+        'Không thể tạo chủ đề thảo luận: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _updateDiscussion(Discussion discussion, String content, DiscussionType type) async {
+    try {
+      dev.log('Updating discussion...', name: 'ForumTab');
+      dev.log('Discussion ID: ${discussion.id}', name: 'ForumTab');
+      dev.log('New content: $content', name: 'ForumTab');
+      dev.log('New type: $type', name: 'ForumTab');
+      
+      await _discussionService.updateDiscussion(
+        discussion.id!,
+        {
+          'content': content,
+          'type': type.toString(),
+        },
+      );
+      
+      dev.log('Discussion updated successfully', name: 'ForumTab');
+      Get.snackbar(
+        'Thành công',
+        'Đã cập nhật chủ đề thảo luận',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      dev.log('Error updating discussion: $e', name: 'ForumTab', error: e);
+      Get.snackbar(
+        'Lỗi',
+        'Không thể cập nhật chủ đề thảo luận: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _togglePinDiscussion(Discussion discussion) async {
+    try {
+      dev.log('Toggling pin status...', name: 'ForumTab');
+      dev.log('Discussion ID: ${discussion.id}', name: 'ForumTab');
+      dev.log('Current pin status: ${discussion.isPinned}', name: 'ForumTab');
+      
+      await _discussionService.togglePinDiscussion(
+        discussion.id!,
+        !discussion.isPinned,
+      );
+      
+      dev.log('Pin status toggled successfully', name: 'ForumTab');
+      Get.snackbar(
+        'Thành công',
+        discussion.isPinned ? 'Đã bỏ ghim chủ đề' : 'Đã ghim chủ đề lên đầu',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      dev.log('Error toggling pin: $e', name: 'ForumTab', error: e);
+      Get.snackbar(
+        'Lỗi',
+        'Không thể thay đổi trạng thái ghim: $e',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 }

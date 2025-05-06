@@ -165,6 +165,13 @@
             </intent-filter>
         </receiver>
             
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="discussion_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+            
         <!-- FileProvider configuration -->
         <provider
             android:name="androidx.core.content.FileProvider"
