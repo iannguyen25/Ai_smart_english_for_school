@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:math';
 import '../../models/flashcard.dart';
 import '../../models/flashcard_item.dart';
 
@@ -40,40 +41,61 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
   }
 
   List<FlashcardItem> _getRandomItems(List<FlashcardItem> items) {
+    print('Getting random items from ${items.length} total items');
+    
     // Lọc bỏ các item không hợp lệ
     final validItems = items.where((item) => 
       item.type == FlashcardItemType.textToText || 
       item.type == FlashcardItemType.imageToText
     ).toList();
+    
+    print('Found ${validItems.length} valid items');
 
     // Nếu số lượng item hợp lệ ít hơn hoặc bằng maxItems, trả về tất cả
     if (validItems.length <= widget.maxItems) {
+      print('Using all valid items (${validItems.length} <= ${widget.maxItems})');
       return List.from(validItems);
     }
 
     // Tạo một bản sao của danh sách để tránh ảnh hưởng đến dữ liệu gốc
     final shuffledItems = List<FlashcardItem>.from(validItems);
     shuffledItems.shuffle();
+    
+    print('Shuffled items and taking ${widget.maxItems} items');
+    print('First few questions:');
+    for (var i = 0; i < min(3, shuffledItems.length); i++) {
+      print('- ${shuffledItems[i].question}');
+    }
 
     // Lấy ngẫu nhiên maxItems thẻ
     return shuffledItems.take(widget.maxItems).toList();
   }
 
   void _initializeGame() {
-    // Lấy ngẫu nhiên các thẻ
-    _selectedItems = _getRandomItems(widget.items);
-    
-    // Trộn ngẫu nhiên
-    _selectedItems.shuffle();
-    
-    // Khởi tạo trạng thái đã trả lời
-    _answered = List.filled(_selectedItems.length, false);
-    
-    _currentIndex = 0;
-    _score = 0;
-    _userAnswer = '';
-    _showResult = false;
-    _answerController.clear(); // Clear input khi khởi tạo lại game
+    print('\nInitializing new game...');
+    setState(() {
+      // Lấy ngẫu nhiên các thẻ
+      _selectedItems = _getRandomItems(widget.items);
+      
+      // Trộn ngẫu nhiên
+      _selectedItems.shuffle();
+      print('Shuffled questions again:');
+      for (var i = 0; i < min(3, _selectedItems.length); i++) {
+        print('- ${_selectedItems[i].question}');
+      }
+      
+      // Khởi tạo trạng thái đã trả lời
+      _answered = List.filled(_selectedItems.length, false);
+      
+      // Reset tất cả các trạng thái
+      _currentIndex = 0;
+      _score = 0;
+      _userAnswer = '';
+      _showResult = false;
+      _isCorrect = false;
+      _answerController.clear();
+    });
+    print('Game initialized with ${_selectedItems.length} questions\n');
   }
 
   void _checkAnswer() {

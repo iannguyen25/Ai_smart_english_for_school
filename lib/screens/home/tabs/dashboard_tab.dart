@@ -1,3 +1,4 @@
+import 'package:base_flutter_framework/screens/admin/admin_dashboard_screen.dart';
 import 'package:base_flutter_framework/screens/flashcards/create_edit_flashcard_screen.dart';
 import 'package:base_flutter_framework/screens/folder/create_edit_folder_screen.dart';
 import 'package:base_flutter_framework/screens/home/tabs/ai_chat_tab.dart';
@@ -12,8 +13,12 @@ import '../../classroom/join_by_code_screen.dart';
 import '../../classroom/create_edit_classroom_screen.dart';
 import '../../translate/translate_screen.dart';
 import '../../../models/classroom.dart';
+import '../../../models/user.dart';
 import '../../../services/classroom_service.dart';
 import '../../../services/auth_service.dart';
+import '../../admin/user_management_screen.dart';
+import '../../admin/course_management_screen.dart';
+import '../../admin/content_management_screen.dart';
 
 class DashboardTab extends StatefulWidget {
   const DashboardTab({Key? key}) : super(key: key);
@@ -276,6 +281,56 @@ class _DashboardTabState extends State<DashboardTab> {
             //     ),
             //   ],
             // ),
+
+            const SizedBox(height: 24),
+
+            // Admin Management Section
+            if (_authService.currentUser?.roleId == 'admin') ...[
+              Text(
+                'Quản lý hệ thống',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.5,
+                children: [
+                  _buildQuickActionCard(
+                    icon: Icons.people,
+                    title: 'Quản lý người dùng',
+                    subtitle: 'Quản lý tài khoản và phân quyền',
+                    onTap: () => Get.to(() => const UserManagementScreen()),
+                    color: Colors.blue,
+                  ),
+                  _buildQuickActionCard(
+                    icon: Icons.school,
+                    title: 'Quản lý khóa học',
+                    subtitle: 'Quản lý khóa học và bài học',
+                    onTap: () => Get.to(() => const CourseManagementScreen()),
+                    color: Colors.green,
+                  ),
+                  _buildQuickActionCard(
+                    icon: Icons.article,
+                    title: 'Quản lý nội dung',
+                    subtitle: 'Duyệt và quản lý nội dung',
+                    onTap: () => Get.to(() => const ContentManagementScreen()),
+                    color: Colors.orange,
+                  ),
+                  _buildQuickActionCard(
+                    icon: Icons.article,
+                    title: 'Dashboard tổng quan',
+                    subtitle: 'Duyệt và quản lý nội dung',
+                    onTap: () => Get.to(() => const AdminDashboardScreen()),
+                    color: Colors.purple,
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

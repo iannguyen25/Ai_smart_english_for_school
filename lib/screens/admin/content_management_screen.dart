@@ -1,106 +1,84 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/analytics_service.dart';
 import '../../utils/snackbar_helper.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:get/get.dart';
-import 'user_management_screen.dart';
-import 'create_edit_course_screen.dart';
-import 'course_management_screen.dart';
 
-class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({Key? key}) : super(key: key);
+class ContentManagementScreen extends StatefulWidget {
+  const ContentManagementScreen({Key? key}) : super(key: key);
 
   @override
-  _AdminDashboardScreenState createState() => _AdminDashboardScreenState();
+  _ContentManagementScreenState createState() => _ContentManagementScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+class _ContentManagementScreenState extends State<ContentManagementScreen> {
   final AnalyticsService _analyticsService = AnalyticsService();
-  
   bool _isLoading = true;
-  
-  // Dữ liệu báo cáo
-  Map<String, dynamic> _systemOverview = {};
   Map<String, dynamic> _resourcesReport = {};
-  
-  // Thời gian báo cáo
+  Map<String, dynamic> _systemOverview = {};
   int _selectedPeriod = 30; // Mặc định 30 ngày
   final List<int> _periodOptions = [7, 30, 90];
-  
+
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
+    _loadResourcesData();
   }
-  
-  // Tải dữ liệu dashboard
-  Future<void> _loadDashboardData() async {
+
+  Future<void> _loadResourcesData() async {
     setState(() => _isLoading = true);
     
     try {
-      // Tải tổng quan hệ thống
-      final systemOverview = await _analyticsService.getSystemOverview(
-        days: _selectedPeriod,
-      );
-      
       // Tải báo cáo tài nguyên học tập
       final resourcesReport = await _analyticsService.getLearningResourcesReport(
         days: _selectedPeriod,
       );
       
+      // Tải tổng quan hệ thống để lấy nội dung chờ duyệt
+      final systemOverview = await _analyticsService.getSystemOverview(
+        days: _selectedPeriod,
+      );
+      
+      print('System Overview: $systemOverview');
+      print('Pending Content: ${systemOverview['pendingContent']}');
+      
       if (mounted) {
         setState(() {
-          _systemOverview = systemOverview;
           _resourcesReport = resourcesReport;
+          _systemOverview = systemOverview;
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('Error loading dashboard data: $e');
+      print('Error loading resources data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         SnackbarHelper.showError(
           context: context,
-          message: 'Không thể tải dữ liệu dashboard: ${e.toString()}',
+          message: 'Không thể tải dữ liệu tài nguyên: ${e.toString()}',
         );
       }
     }
   }
-  
-  // Thay đổi khoảng thời gian
+
   void _changePeriod(int days) {
     setState(() {
       _selectedPeriod = days;
     });
-    _loadDashboardData();
+    _loadResourcesData();
   }
-  
-  // Thêm phương thức để mở màn hình quản lý khóa học
-  void _navigateToCourseManagement() {
-    Get.to(() => const CourseManagementScreen());
-  }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 82, 81, 81),
       appBar: AppBar(
-        title: const Text(
-          'Dashboard',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF2D2D2D),
+        title: const Text('Quản lý nội dung'),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Theme.of(context).primaryColor,
         actions: [
           PopupMenuButton<int>(
             tooltip: 'Chọn khoảng thời gian',
-            icon: const Icon(Icons.date_range, color: Colors.white),
+            icon: const Icon(Icons.date_range),
             onSelected: _changePeriod,
             itemBuilder: (context) => _periodOptions
                 .map((days) => PopupMenuItem<int>(
@@ -110,22 +88,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 .toList(),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadDashboardData,
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadResourcesData,
             tooltip: 'Làm mới dữ liệu',
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _buildDashboard(),
+          : _buildContentManagement(),
     );
   }
-  
-  // Xây dựng dashboard
-  Widget _buildDashboard() {
+
+  Widget _buildContentManagement() {
     return RefreshIndicator(
-      onRefresh: _loadDashboardData,
+      onRefresh: _loadResourcesData,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -135,36 +112,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF2D2D2D),
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.calendar_today, color: Colors.blue),
-                  ),
+                  const Icon(Icons.calendar_today, color: Colors.blue),
                   const SizedBox(width: 12),
                   Text(
                     'Thống kê ${_selectedPeriod} ngày gần đây',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
                   ),
                 ],
               ),
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Thống kê tổng quan
-            _buildOverviewStats(),
             
             const SizedBox(height: 24),
             
@@ -187,128 +151,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-  
-  // Thống kê tổng quan
-  Widget _buildOverviewStats() {
-    return Card(
-      elevation: 0,
-      color: const Color(0xFF2D2D2D),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.analytics, color: Colors.blue),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Thống kê tổng quan',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.5,
-              children: [
-                _buildStatCard(
-                  'Người dùng',
-                  '${_systemOverview['totalUsers'] ?? 0}',
-                  Icons.people,
-                  Colors.blue,
-                ),
-                _buildStatCard(
-                  'Lớp học',
-                  '${_systemOverview['totalClassrooms'] ?? 0}',
-                  Icons.class_,
-                  Colors.green,
-                ),
-                _buildStatCard(
-                  'Bài học',
-                  '${_systemOverview['totalLessons'] ?? 0}',
-                  Icons.book,
-                  Colors.orange,
-                ),
-                _buildStatCard(
-                  'Flashcards',
-                  '${_systemOverview['totalFlashcards'] ?? 0}',
-                  Icons.card_membership,
-                  Colors.purple,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  // Thẻ thống kê đơn
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2A2A2A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 28, color: color),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Thống kê tài nguyên học tập
+
   Widget _buildResourcesStats() {
     final newResourcesData = [
       {
@@ -342,8 +185,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ];
     
     return Card(
-      elevation: 0,
-      color: const Color(0xFF2A2A2A),
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -357,7 +199,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.2),
+                    color: Colors.blue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.analytics, color: Colors.blue),
@@ -368,7 +210,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
                 ),
               ],
@@ -381,7 +222,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: (resource['color'] as Color).withOpacity(0.2),
+                      color: (resource['color'] as Color).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -397,7 +238,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -408,7 +248,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -419,14 +258,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.2),
+                        color: Colors.green.shade50,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.green.withOpacity(0.3)),
+                        border: Border.all(color: Colors.green.shade200),
                       ),
                       child: Text(
                         '+${resource['new']}',
-                        style: const TextStyle(
-                          color: Colors.green,
+                        style: TextStyle(
+                          color: Colors.green.shade700,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -441,11 +280,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // Thống kê bài học có vấn đề
   Widget _buildProblematicLessons() {
     return Card(
-      elevation: 0,
-      color: const Color(0xFF2A2A2A),
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -459,7 +296,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
+                    color: Colors.orange.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.warning, color: Colors.orange),
@@ -470,7 +307,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
                 ),
               ],
@@ -486,9 +322,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF333333),
+                    color: Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    border: Border.all(color: Colors.grey.shade200),
                   ),
                   child: Row(
                     children: [
@@ -501,14 +337,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               '${lesson['reportCount']} báo cáo',
                               style: TextStyle(
-                                color: Colors.grey[300],
+                                color: Colors.grey.shade600,
                                 fontSize: 14,
                               ),
                             ),
@@ -521,14 +356,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.2),
+                          color: Colors.red.shade50,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.red.withOpacity(0.3)),
+                          border: Border.all(color: Colors.red.shade200),
                         ),
                         child: Text(
                           '${lesson['reportCount']} báo cáo',
-                          style: const TextStyle(
-                            color: Colors.red,
+                          style: TextStyle(
+                            color: Colors.red.shade700,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -547,8 +382,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildPendingContentSection() {
     return Card(
-      elevation: 0,
-      color: const Color(0xFF2A2A2A),
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -562,7 +396,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.2),
+                    color: Colors.purple.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.pending_actions, color: Colors.purple),
@@ -573,7 +407,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
                 ),
               ],
@@ -592,9 +425,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF333333),
+          color: Colors.grey.shade50,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          border: Border.all(color: Colors.grey.shade200),
         ),
         child: const Center(
           child: Text(
@@ -618,9 +451,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF333333),
+            color: Colors.grey.shade50,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+            border: Border.all(color: Colors.grey.shade200),
           ),
           child: Row(
             children: [
@@ -633,14 +466,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${content['type'] == 'lesson' ? 'Bài học' : 'Flashcard'} • ${content['authorName'] ?? 'Không xác định'}',
                       style: TextStyle(
-                        color: Colors.grey[300],
+                        color: Colors.grey.shade600,
                         fontSize: 14,
                       ),
                     ),
@@ -652,7 +484,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
+                      color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: IconButton(
@@ -663,7 +495,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(width: 8),
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.2),
+                      color: Colors.red.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: IconButton(
@@ -680,82 +512,73 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // Duyệt nội dung
   Future<void> _approveResource(String resourceId) async {
     try {
-      await _analyticsService.approveContent(resourceId);
-      _loadDashboardData(); // Tải lại dữ liệu
-      if (mounted) {
-        SnackbarHelper.showSuccess(
-          context: context,
-          message: 'Đã duyệt nội dung',
-        );
+      // Kiểm tra xem resourceId có chứa thông tin về loại nội dung không
+      final parts = resourceId.split('_');
+      if (parts.length != 2) {
+        throw Exception('Invalid resource ID format');
       }
+
+      final type = parts[0];
+      final id = parts[1];
+      final collection = type == 'lesson' ? 'lessons' : 'flashcards';
+
+      await FirebaseFirestore.instance
+          .collection(collection)
+          .doc(id)
+          .update({
+        'approvalStatus': 'approved',
+        'approvedAt': FieldValue.serverTimestamp(),
+      });
+      
+      SnackbarHelper.showSuccess(
+        context: context,
+        message: 'Đã phê duyệt nội dung',
+      );
+      
+      // Refresh data
+      _loadResourcesData();
     } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(
-          context: context,
-          message: 'Không thể duyệt nội dung: ${e.toString()}',
-        );
-      }
+      SnackbarHelper.showError(
+        context: context,
+        message: 'Không thể phê duyệt nội dung: ${e.toString()}',
+      );
     }
   }
 
-  // Từ chối nội dung
   Future<void> _rejectResource(String resourceId) async {
     try {
-      await _analyticsService.rejectContent(resourceId);
-      _loadDashboardData(); // Tải lại dữ liệu
-      if (mounted) {
-        SnackbarHelper.showSuccess(
-          context: context,
-          message: 'Đã từ chối nội dung',
-        );
+      // Kiểm tra xem resourceId có chứa thông tin về loại nội dung không
+      final parts = resourceId.split('_');
+      if (parts.length != 2) {
+        throw Exception('Invalid resource ID format');
       }
-    } catch (e) {
-      if (mounted) {
-        SnackbarHelper.showError(
-          context: context,
-          message: 'Không thể từ chối nội dung: ${e.toString()}',
-        );
-      }
-    }
-  }
 
-  // Thêm widget CardButton cho các tác vụ quản trị viên
-  Widget _buildAdminActionCard({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: color,
-                size: 40,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+      final type = parts[0];
+      final id = parts[1];
+      final collection = type == 'lesson' ? 'lessons' : 'flashcards';
+
+      await FirebaseFirestore.instance
+          .collection(collection)
+          .doc(id)
+          .update({
+        'approvalStatus': 'rejected',
+        'rejectedAt': FieldValue.serverTimestamp(),
+      });
+      
+      SnackbarHelper.showSuccess(
+        context: context,
+        message: 'Đã từ chối nội dung',
+      );
+      
+      // Refresh data
+      _loadResourcesData();
+    } catch (e) {
+      SnackbarHelper.showError(
+        context: context,
+        message: 'Không thể từ chối nội dung: ${e.toString()}',
+      );
+    }
   }
 } 
