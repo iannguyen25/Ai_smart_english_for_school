@@ -73,33 +73,35 @@ class _MatchingGameState extends State<MatchingGame> with SingleTickerProviderSt
   }
 
   void _initializeGame() {
-    // Lấy ngẫu nhiên các thẻ
-    final selectedItems = _getRandomItems(widget.items);
-    
-    // Tạo bản sao của items để không ảnh hưởng đến dữ liệu gốc
-    _questions = List.from(selectedItems);
-    _answers = List.from(selectedItems);
-    
-    // Trộn ngẫu nhiên
-    _questions.shuffle();
-    _answers.shuffle();
-    
-    // Khởi tạo trạng thái đã ghép
-    _matchedQuestions = List.filled(_questions.length, false);
-    _matchedAnswers = List.filled(_answers.length, false);
-    
-    // Khởi tạo opacity và height cho tất cả các thẻ
-    for (int i = 0; i < _questions.length; i++) {
-      _questionOpacity[i] = 1.0;
-      _answerOpacity[i] = 1.0;
-      _questionHeight[i] = 1.0;
-      _answerHeight[i] = 1.0;
-    }
-    
-    _matches = 0;
-    _score = 0;
-    _selectedQuestion = null;
-    _selectedAnswer = null;
+    setState(() {
+      // Lấy ngẫu nhiên các thẻ
+      final selectedItems = _getRandomItems(widget.items);
+      
+      // Tạo bản sao của items để không ảnh hưởng đến dữ liệu gốc
+      _questions = List.from(selectedItems);
+      _answers = List.from(selectedItems);
+      
+      // Trộn ngẫu nhiên
+      _questions.shuffle();
+      _answers.shuffle();
+      
+      // Khởi tạo trạng thái đã ghép
+      _matchedQuestions = List.filled(_questions.length, false);
+      _matchedAnswers = List.filled(_answers.length, false);
+      
+      // Khởi tạo opacity và height cho tất cả các thẻ
+      for (int i = 0; i < _questions.length; i++) {
+        _questionOpacity[i] = 1.0;
+        _answerOpacity[i] = 1.0;
+        _questionHeight[i] = 1.0;
+        _answerHeight[i] = 1.0;
+      }
+      
+      _matches = 0;
+      _score = 0;
+      _selectedQuestion = null;
+      _selectedAnswer = null;
+    });
   }
 
   void _selectQuestion(FlashcardItem item, int index) {
