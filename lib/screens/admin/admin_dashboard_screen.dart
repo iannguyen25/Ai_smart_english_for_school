@@ -684,7 +684,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.check, color: Colors.green),
-                      onPressed: () => _approveContent('${content['type']}_${content['id']}'),
+                      onPressed: () {},
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -695,7 +695,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
-                      onPressed: () => _rejectContent('${content['type']}_${content['id']}'),
+                      onPressed: (){}
                     ),
                   ),
                 ],
@@ -708,7 +708,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // Duyệt nội dung
-  Future<void> _approveContent(String contentId) async {
+  Future<void> _approveResource(String resourceId) async {
     try {
       // Kiểm tra quyền người dùng
       final currentUser = await _authService.getCurrentUserProfile();
@@ -722,7 +722,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         throw Exception('User does not have permission to approve content');
       }
       
-      await _analyticsService.approveContent(contentId);
+      // await _analyticsService.approveContent(contentId);
       _loadDashboardData(); // Tải lại dữ liệu
       if (mounted) {
         SnackbarHelper.showSuccess(
@@ -742,7 +742,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // Từ chối nội dung
-  Future<void> _rejectContent(String contentId) async {
+  Future<void> _rejectResource(String resourceId) async {
     try {
       // Kiểm tra quyền người dùng
       final currentUser = await _authService.getCurrentUserProfile();
@@ -756,7 +756,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         throw Exception('User does not have permission to reject content');
       }
       
-      await _analyticsService.rejectContent(contentId);
+      // await _analyticsService.rejectContent(contentId);
       _loadDashboardData(); // Tải lại dữ liệu
       if (mounted) {
         SnackbarHelper.showSuccess(
