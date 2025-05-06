@@ -62,13 +62,14 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
   int _timeSpentSeconds = 0;
   DateTime? _startTime;
   List<FlashcardItem> _flashcardItems = [];
+  bool _isCourseClosed = false;
   
   // Video controllers
   Map<String, dynamic> _videoControllers = {};
   int _currentVideoIndex = 0;
   bool _isTracking = false;
   double _videoWatchedPercentage = 0.0;
-  
+
   @override
   void initState() {
     super.initState();
@@ -82,11 +83,67 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
     _checkUserRole();
     _loadLearningProgress();
     _loadFlashcardItems();
+    _checkCourseStatus();
+  }
+
+  Future<void> _checkCourseStatus() async {
+    try {
+      final courseDoc = await FirebaseFirestore.instance
+          .collection('courses')
+          .doc(widget.classroomId)
+          .get();
+      
+      if (courseDoc.exists) {
+        final courseData = courseDoc.data();
+        setState(() {
+          _isCourseClosed = courseData?['isClosed'] ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error checking course status: $e');
+    }
+  }
+
+  // Thêm nút chỉnh sửa bài học
+  Widget _buildEditButton() {
+    if (_isCourseClosed) {
+      return Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock, color: Colors.orange.shade900),
+            const SizedBox(width: 8),
+            Text(
+              'Khóa học đã bị khóa',
+              style: TextStyle(
+                color: Colors.orange.shade900,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return IconButton(
+      icon: const Icon(Icons.edit),
+      onPressed: () {
+        // Chuyển đến màn hình chỉnh sửa bài học
+        Get.toNamed('/lessons/edit', arguments: {
+          'lessonId': widget.lessonId,
+          'classroomId': widget.classroomId,
+        });
+      },
+    );
   }
   
   @override
   void dispose() {
-    _tabController.dispose();
     // Dispose all video controllers
     _videoControllers.forEach((_, controller) {
       if (controller is YoutubePlayerController) {
@@ -690,6 +747,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
               ),
             ],
           ),
+          if (_lesson != null) _buildEditButton(),
         ],
       ),
       body: Column(

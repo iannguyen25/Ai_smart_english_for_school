@@ -499,7 +499,8 @@ class AuthService {
   bool get isCurrentUserAdmin {
     final user = currentUser;
     // Kiểm tra roleId được thiết lập là 'admin'
-    return user?.roleId == 'admin';
+    final isAdmin = user?.roleId == 'admin';
+    return isAdmin;
   }
   
   // Kiểm tra xem người dùng hiện tại có phải là giáo viên không

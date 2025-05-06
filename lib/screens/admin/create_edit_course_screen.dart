@@ -156,8 +156,7 @@ class _CreateEditCourseScreenState extends State<CreateEditCourseScreen> {
           snackPosition: SnackPosition.BOTTOM,
         );
         
-        Get.back(result: true);
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       } else {
         // Cập nhật
         await FirebaseFirestore.instance
@@ -175,7 +174,7 @@ class _CreateEditCourseScreenState extends State<CreateEditCourseScreen> {
           snackPosition: SnackPosition.BOTTOM,
         );
         
-        Get.back(result: true);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       print('Error saving course: $e');

@@ -23,6 +23,12 @@ service cloud.firestore {
         get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
     }
 
+    function isCourseClosed(classroomId) {
+      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId));
+      let courseId = classroom.data.courseId;
+      return courseId != null && get(/databases/$(database)/documents/courses/$(courseId)).data.isClosed == true;
+    }
+
     // Admin có quyền truy cập tất cả collections
     match /{document=**} {
       allow read, write: if isAdmin();
@@ -30,25 +36,29 @@ service cloud.firestore {
 
     match /classrooms/{classroomId} {
       allow read: if isAuthenticated() && (
-        resource.data.isPublic == true || 
-        request.query.limit <= 1 ||
-        isOwner(resource.data.teacherId) ||
-        isMember(resource.data.memberIds) ||
-        request.auth.uid in resource.data.pendingMemberIds
+        isAdmin() ||
+        resource.data.teacherId == request.auth.uid ||
+        resource.data.memberIds.hasAny([request.auth.uid]) ||
+        resource.data.isPublic == true
       );
       
       allow create: if isAuthenticated();
       
       allow update: if isAuthenticated() && (
-        isOwner(resource.data.teacherId) ||
+        isTeacherOfClass(classroomId) ||
+        isAdmin() ||
         (request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['memberIds', 'pendingMemberIds', 'updatedAt']))
+          .hasOnly(['memberIds', 'pendingMemberIds', 'updatedAt']) &&
+         isMember(resource.data.memberIds))
       );
       
       allow delete: if isAuthenticated() && 
-        isOwner(resource.data.teacherId);
+        (isTeacherOfClass(classroomId) || isAdmin());
 
-      allow list: if isAuthenticated();
+      allow list: if isAuthenticated() && (
+        isAdmin() ||
+        request.query.limit <= 50
+      );
     }
 
     match /users/{userId} {
@@ -128,12 +138,34 @@ service cloud.firestore {
     
     match /lessons/{lessonId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (
-        request.auth.uid == resource.data.teacherId ||
-        request.auth.uid == get(/databases/$(database)/documents/classrooms/$(resource.data.classroomId)).data.teacherId ||
-        isAdmin() ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completedBy', 'updatedAt']) &&
-         isStudentInClassroom(resource.data.classroomId))
+      
+      // Allow create if user is teacher of the classroom and course is not closed
+      allow create: if isAuthenticated() && (
+        !isCourseClosed(request.resource.data.classroomId) && (
+          request.auth.uid == request.resource.data.teacherId ||
+          isTeacherOfClass(request.resource.data.classroomId) ||
+          isAdmin()
+        )
+      );
+      
+      // Allow update if user is teacher or student (for completing lessons)
+      allow update: if isAuthenticated() && (
+        !isCourseClosed(resource.data.classroomId) && (
+          request.auth.uid == resource.data.teacherId ||
+          isTeacherOfClass(resource.data.classroomId) ||
+          isAdmin() ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(["completedBy", "updatedAt"]) &&
+           isStudentInClassroom(resource.data.classroomId))
+        )
+      );
+      
+      // Allow delete if user is teacher and course is not closed
+      allow delete: if isAuthenticated() && (
+        !isCourseClosed(resource.data.classroomId) && (
+          request.auth.uid == resource.data.teacherId ||
+          isTeacherOfClass(resource.data.classroomId) ||
+          isAdmin()
+        )
       );
     }
 
@@ -341,15 +373,6 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && (
         request.auth.uid == resource.data.userId ||
         isAdmin()
-      );
-    }
-
-    // User tokens collection for FCM
-    match /user_tokens/{tokenId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (
-        request.resource.data.userId == request.auth.uid ||
-        request.resource.data.userId == null
       );
     }
   }

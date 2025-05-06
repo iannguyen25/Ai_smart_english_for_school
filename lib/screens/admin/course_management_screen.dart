@@ -99,16 +99,20 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
     }
   }
   
-  // Xóa khóa học
-  Future<void> _deleteCourse(Course course) async {
+  // Khóa/Mở khóa khóa học
+  Future<void> _toggleCourseStatus(Course course) async {
     try {
       // Hiển thị dialog xác nhận
       final confirm = await showDialog<bool>(
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('Xóa khóa học'),
-            content: Text('Bạn có chắc chắn muốn xóa khóa học "${course.name}" không? Hành động này không thể hoàn tác.'),
+            title: Text(course.isClosed ? 'Mở khóa khóa học' : 'Khóa khóa học'),
+            content: Text(
+              course.isClosed
+                  ? 'Bạn có chắc chắn muốn mở khóa khóa học "${course.name}" không?'
+                  : 'Bạn có chắc chắn muốn khóa khóa học "${course.name}" không? Học viên đã tham gia vẫn có thể truy cập nội dung.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -116,8 +120,10 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Xóa'),
+                style: TextButton.styleFrom(
+                  foregroundColor: course.isClosed ? Colors.green : Colors.orange,
+                ),
+                child: Text(course.isClosed ? 'Mở khóa' : 'Khóa'),
               ),
             ],
           );
@@ -126,23 +132,26 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
       
       if (confirm != true) return;
       
-      // Xóa khóa học
-      await _firestore.collection('courses').doc(course.id).delete();
+      // Cập nhật trạng thái khóa học
+      await _firestore.collection('courses').doc(course.id).update({
+        'isClosed': !course.isClosed,
+        'updatedAt': Timestamp.now(),
+      });
       
       // Hiển thị thông báo thành công
       Get.snackbar(
         'Thành công',
-        'Đã xóa khóa học',
+        course.isClosed ? 'Đã mở khóa khóa học' : 'Đã khóa khóa học',
         snackPosition: SnackPosition.BOTTOM,
       );
       
       // Tải lại danh sách
       _loadCourses();
     } catch (e) {
-      print('Error deleting course: $e');
+      print('Error toggling course status: $e');
       Get.snackbar(
         'Lỗi',
-        'Không thể xóa khóa học: ${e.toString()}',
+        'Không thể thay đổi trạng thái khóa học: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade700,
@@ -474,11 +483,11 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
-                          onPressed: () => _deleteCourse(course),
-                          icon: const Icon(Icons.delete),
-                          label: const Text('Xóa'),
+                          onPressed: () => _toggleCourseStatus(course),
+                          icon: Icon(course.isClosed ? Icons.lock_open : Icons.lock),
+                          label: Text(course.isClosed ? 'Mở khóa' : 'Khóa'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
+                            foregroundColor: course.isClosed ? Colors.green : Colors.orange,
                           ),
                         ),
                       ],

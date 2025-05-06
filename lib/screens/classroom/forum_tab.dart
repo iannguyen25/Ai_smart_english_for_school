@@ -69,11 +69,11 @@ class _ForumTabState extends State<ForumTab> {
           debugPrint('📝 First discussion: ${discussions.isNotEmpty ? discussions.first.content : "No discussions"}');
           
           if (mounted) {
-            setState(() {
-              _discussions = discussions;
-              _isLoading = false;
-              _errorMessage = null;
-            });
+      setState(() {
+        _discussions = discussions;
+        _isLoading = false;
+        _errorMessage = null;
+      });
             debugPrint('✅ Updated UI with new discussions');
           } else {
             debugPrint('⚠️ Widget not mounted, skipping UI update');
@@ -98,10 +98,10 @@ class _ForumTabState extends State<ForumTab> {
     } catch (e) {
       debugPrint('❌ Error setting up discussion stream: $e');
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
-        });
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
         Get.snackbar(
           'Lỗi',
           'Không thể tải danh sách thảo luận',
@@ -691,7 +691,7 @@ class _ForumTabState extends State<ForumTab> {
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
-
+  
   Future<void> _subscribeToNotifications() async {
     try {
       await _discussionService.subscribeToClassroom(widget.classroomId);
@@ -735,11 +735,11 @@ class _ForumTabState extends State<ForumTab> {
       dev.log('Discussion created successfully', name: 'ForumTab');
       dev.log('New discussion ID: ${newDiscussion.id}', name: 'ForumTab');
       
-      Get.snackbar(
-        'Thành công',
-        'Đã tạo chủ đề thảo luận mới',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+                Get.snackbar(
+                  'Thành công',
+                  'Đã tạo chủ đề thảo luận mới',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
     } catch (e) {
       dev.log('Error creating discussion: $e', name: 'ForumTab', error: e);
       Get.snackbar(

@@ -36,12 +36,12 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
   String? _selectedCourseId;
 
   // Thêm getter để kiểm tra vai trò
+  bool get _isAdmin => _authService.isCurrentUserAdmin;
   bool get _showTeachingTab => _authService.isCurrentUserTeacher || _authService.isCurrentUserAdmin;
   bool get _showLearningTab => !_authService.isCurrentUserTeacher || _authService.isCurrentUserAdmin;
   
   // Tính số lượng tab dựa trên vai trò
   int get _tabCount {
-    if (_authService.isCurrentUserAdmin) return 2;
     return 1;
   }
 
@@ -79,10 +79,15 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
       final classrooms = await _classroomService.getUserClassrooms(userId);
 
       setState(() {
-        _teachingClassrooms =
-            classrooms.where((c) => c.teacherId == userId).toList();
-        _learningClassrooms =
-            classrooms.where((c) => c.memberIds.contains(userId)).toList();
+        if (_isAdmin) {
+          // Admin sees all classrooms in one list
+          _teachingClassrooms = classrooms;
+          _learningClassrooms = [];
+        } else {
+          // Regular users see teaching and learning classrooms separately
+          _teachingClassrooms = classrooms.where((c) => c.teacherId == userId).toList();
+          _learningClassrooms = classrooms.where((c) => c.memberIds.contains(userId)).toList();
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -101,7 +106,6 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
 
   @override
   Widget build(BuildContext context) {
-    print('Building with ${_courses.length} courses');
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -115,9 +119,11 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: [
-            if (_showTeachingTab)
+            if (_isAdmin)
+              const Tab(text: 'Tất cả lớp học'),
+            if (!_isAdmin && _showTeachingTab)
               const Tab(text: '    Dạy    '),
-            if (_showLearningTab)
+            if (!_isAdmin && _showLearningTab)
               const Tab(text: '    Học    '),
           ],
           indicatorWeight: 3,
@@ -198,7 +204,15 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
                       child: TabBarView(
                         controller: _tabController,
                         children: [
-                          if (_showTeachingTab)
+                          if (_isAdmin)
+                            // Tab Tất cả lớp học
+                            RefreshIndicator(
+                              onRefresh: _loadData,
+                              child: _getFilteredClassrooms(_teachingClassrooms).isEmpty
+                                  ? _buildEmptyState(true)
+                                  : _buildClassroomGrid(_getFilteredClassrooms(_teachingClassrooms), true),
+                            ),
+                          if (!_isAdmin && _showTeachingTab)
                             // Tab Dạy
                             RefreshIndicator(
                               onRefresh: _loadData,
@@ -206,7 +220,7 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
                                   ? _buildEmptyState(true)
                                   : _buildClassroomGrid(_getFilteredClassrooms(_teachingClassrooms), true),
                             ),
-                          if (_showLearningTab)
+                          if (!_isAdmin && _showLearningTab)
                             // Tab Học
                             RefreshIndicator(
                               onRefresh: _loadData,
@@ -219,7 +233,7 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
                     ),
                   ],
                 ),
-      floatingActionButton: _showTeachingTab
+      floatingActionButton: _isAdmin
           ? FloatingActionButton(
               onPressed: () async {
                 final result = await Get.to(() => const CreateEditClassroomScreen());
@@ -281,9 +295,7 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
                   _loadData();
                 }
               } else {
-                Get.to(() {}
-                    // => const JoinClassroomScreen()
-                    );
+                Get.to(() => JoinByCodeScreen());
               }
             },
             icon: Icon(isTeachingTab ? Icons.add : Icons.group_add),

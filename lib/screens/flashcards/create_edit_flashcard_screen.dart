@@ -50,6 +50,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
   List<FlashcardItem> _items = [];
   bool _isEditMode = false;
   bool _isProcessingOCR = false;
+  bool _isCourseClosed = false;
 
   @override
   void initState() {
@@ -72,6 +73,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
         answer: '',
       ));
     }
+    _checkCourseStatus();
   }
 
   @override
@@ -534,8 +536,70 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
     }
   }
 
+  Future<void> _checkCourseStatus() async {
+    if (widget.classroomId != null) {
+      try {
+        final courseDoc = await FirebaseFirestore.instance
+            .collection('courses')
+            .doc(widget.classroomId)
+            .get();
+        
+        if (courseDoc.exists) {
+          final courseData = courseDoc.data();
+          setState(() {
+            _isCourseClosed = courseData?['isClosed'] ?? false;
+          });
+        }
+      } catch (e) {
+        print('Error checking course status: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isCourseClosed) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Không thể chỉnh sửa'),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.lock,
+                size: 64,
+                color: Colors.orange.shade400,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Khóa học đã bị khóa',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Không thể thêm hoặc chỉnh sửa flashcard khi khóa học đã bị khóa.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Get.back(),
+                child: const Text('Quay lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditMode ? 'Chỉnh sửa bộ thẻ' : 'Tạo bộ thẻ mới'),

@@ -49,6 +49,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
   bool _isLoadingLessons = true;
   bool _isMember = false;
   bool _isTeacher = false;
+  bool _isCourseClosed = false;
   String? _lessonErrorMessage;
   
   // Diễn đàn
@@ -80,6 +81,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
     _loadLessons();
     _loadDiscussions();
     _loadMaterials();
+    _checkCourseStatus();
   }
 
   void _onScroll() {
@@ -101,6 +103,42 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
         _appBarColor = Color.lerp(Colors.blue.shade100.withOpacity(0),
             _appBarColorCollapsed, scrollRatio)!;
       });
+    }
+  }
+
+  Future<void> _checkCourseStatus() async {
+    print('DEBUG: Checking course status for classroom: ${widget.classroomId}');
+    try {
+      // First get the classroom to get courseId
+      final classroomDoc = await FirebaseFirestore.instance
+          .collection('classrooms')
+          .doc(widget.classroomId)
+          .get();
+          
+      if (classroomDoc.exists) {
+        final classroomData = classroomDoc.data();
+        final courseId = classroomData?['courseId'];
+        print('DEBUG: Found classroom, courseId: $courseId');
+        
+        if (courseId != null) {
+          final courseDoc = await FirebaseFirestore.instance
+              .collection('courses')
+              .doc(courseId)
+              .get();
+          
+          if (courseDoc.exists) {
+            final courseData = courseDoc.data();
+            print('DEBUG: Found course, isClosed: ${courseData?['isClosed']}');
+            if (mounted) {
+              setState(() {
+                _isCourseClosed = courseData?['isClosed'] ?? false;
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking course status: $e');
     }
   }
 
@@ -147,6 +185,9 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
 
         _isLoading = false;
       });
+
+      // Sau khi load classroom xong, check course status
+      await _checkCourseStatus();
     } catch (e) {
       // Đảm bảo widget vẫn mounted trước khi setState
       if (!mounted) return;
@@ -813,10 +854,20 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
       ),
       floatingActionButton: _isTeacher
           ? FloatingActionButton(
-              onPressed: _showAddContentDialog,
+              onPressed: _isCourseClosed
+                  ? () {
+                      Get.snackbar(
+                        'Thông báo',
+                        'Không thể thêm bài học vì khóa học đã bị khóa',
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.orange.shade100,
+                        colorText: Colors.orange.shade900,
+                      );
+                    }
+                  : _showAddContentDialog,
               child: const Icon(Icons.add),
-              backgroundColor: Colors.white,
-              tooltip: 'Thêm bài học',
+              backgroundColor: _isCourseClosed ? Colors.grey : Colors.white,
+              tooltip: _isCourseClosed ? 'Khóa học đã bị khóa' : 'Thêm bài học',
             )
           : null,
     );
@@ -1558,15 +1609,22 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
             Padding(
               padding: const EdgeInsets.only(top: 24),
               child: ElevatedButton.icon(
-                onPressed: _showAddContentDialog,
+                onPressed: _isCourseClosed
+                    ? null
+                    : _showAddContentDialog,
                 icon: const Icon(
                   Icons.add,
                   color: Colors.white,
                 ),
-                label: const Text(
-                  'Thêm bài học',
-                  style: TextStyle(color: Colors.white),
-                ),
+                label: _isCourseClosed
+                    ? const Text(
+                        'Khóa học đã bị khóa',
+                        style: TextStyle(color: Colors.white),
+                      )
+                    : const Text(
+                        'Thêm bài học',
+                        style: TextStyle(color: Colors.white),
+                      ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.indigo.shade700,
                   padding:
@@ -1583,6 +1641,16 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
   }
 
   void _showAddContentDialog() {
+    if (_isCourseClosed) {
+      Get.snackbar(
+        'Thông báo',
+        'Không thể thêm bài học vì khóa học đã bị khóa',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange.shade100,
+        colorText: Colors.orange.shade900,
+      );
+      return;
+    }
     _showCreateLessonDialog();
   }
 

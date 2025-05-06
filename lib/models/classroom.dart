@@ -28,6 +28,7 @@ class Classroom {
   final bool isPublic;
   final String? courseId;
   final ClassroomStatus status;
+  final bool isClosed;
   final List<String> customLessonIds;     // Bài học riêng
   final List<String> customFlashcardIds;  // Flashcard riêng
   final List<String> customVideoIds;      // Video bài giảng riêng
@@ -47,6 +48,7 @@ class Classroom {
     this.isPublic = false,
     this.courseId,
     this.status = ClassroomStatus.active,
+    this.isClosed = false,
     List<String>? customLessonIds,
     List<String>? customFlashcardIds,
     List<String>? customVideoIds,
@@ -76,6 +78,7 @@ class Classroom {
       isPublic: map['isPublic'] ?? false,
       courseId: map['courseId'],
       status: _statusFromString(map['status'] ?? 'active'),
+      isClosed: map['isClosed'] ?? false,
       customLessonIds: List<String>.from(map['customLessonIds'] ?? []),
       customFlashcardIds: List<String>.from(map['customFlashcardIds'] ?? []),
       customVideoIds: List<String>.from(map['customVideoIds'] ?? []),
@@ -117,6 +120,7 @@ class Classroom {
       'isPublic': isPublic,
       'courseId': courseId,
       'status': _statusToString(status),
+      'isClosed': isClosed,
       'customLessonIds': customLessonIds,
       'customFlashcardIds': customFlashcardIds,
       'customVideoIds': customVideoIds,
@@ -137,6 +141,7 @@ class Classroom {
     String? courseId,
     bool? isPublic,
     ClassroomStatus? status,
+    bool? isClosed,
     List<String>? customLessonIds,
     List<String>? customFlashcardIds,
     List<String>? customVideoIds,
@@ -155,6 +160,7 @@ class Classroom {
       isPublic: isPublic ?? this.isPublic,
       courseId: courseId ?? this.courseId,
       status: status ?? this.status,
+      isClosed: isClosed ?? this.isClosed,
       customLessonIds: customLessonIds ?? this.customLessonIds,
       customFlashcardIds: customFlashcardIds ?? this.customFlashcardIds,
       customVideoIds: customVideoIds ?? this.customVideoIds,

@@ -4,6 +4,7 @@ import '../models/classroom.dart';
 import 'storage_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/course.dart';
+import '../services/auth_service.dart';
 
 class ClassroomService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -139,14 +140,45 @@ class ClassroomService {
   // Lấy danh sách lớp học của một người dùng
   Future<List<Classroom>> getUserClassrooms(String userId) async {
     try {
-      final snapshot = await _classroomsRef
-          .where('memberIds', arrayContains: userId)
-          .orderBy('updatedAt', descending: true)
-          .get();
+      print('Getting classrooms for user: $userId');
+      
+      final authService = AuthService();
+      final isAdmin = authService.isCurrentUserAdmin;
+      print('Is admin: $isAdmin');
 
-      return snapshot.docs.map((doc) {
-        return Classroom.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
+      if (isAdmin) {
+        print('User is admin, getting all classrooms');
+        final snapshot = await _classroomsRef.get();
+        return snapshot.docs.map((doc) => Classroom.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
+      } else {
+        print('User is not admin, getting teaching and learning classrooms');
+        // Lấy lớp học mà user là giáo viên
+        final teachingSnapshot = await _classroomsRef
+            .where('teacherId', isEqualTo: userId)
+            .get();
+            
+        // Lấy lớp học mà user là thành viên
+        final learningSnapshot = await _classroomsRef
+            .where('memberIds', arrayContains: userId)
+            .get();
+            
+        // Gộp kết quả và loại bỏ trùng lặp
+        final teachingClassrooms = teachingSnapshot.docs.map((doc) => Classroom.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
+        final learningClassrooms = learningSnapshot.docs.map((doc) => Classroom.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
+        
+        // Loại bỏ các lớp học trùng lặp (nếu user vừa là giáo viên vừa là thành viên)
+        final allClassrooms = [...teachingClassrooms];
+        for (var classroom in learningClassrooms) {
+          if (!allClassrooms.any((c) => c.id == classroom.id)) {
+            allClassrooms.add(classroom);
+          }
+        }
+        
+        // Sắp xếp theo updatedAt giảm dần
+        allClassrooms.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        
+        return allClassrooms;
+      }
     } catch (e) {
       print('Error getting user classrooms: $e');
       throw 'Không thể tải danh sách lớp học';

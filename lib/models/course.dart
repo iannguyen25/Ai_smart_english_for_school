@@ -80,6 +80,7 @@ class Course extends BaseModel {
   final List<String> templateFlashcardIds; // Flashcard mẫu (ID)
   final String createdBy;        // ID của admin tạo khóa học
   final bool isPublished;        // Trạng thái xuất bản
+  final bool isClosed;           // Trạng thái đóng khóa học
 
   Course({
     String? id,
@@ -95,6 +96,7 @@ class Course extends BaseModel {
     List<String>? templateFlashcardIds,
     required this.createdBy,
     this.isPublished = false,
+    this.isClosed = false,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) : 
@@ -122,6 +124,7 @@ class Course extends BaseModel {
       templateFlashcardIds: List<String>.from(map['templateFlashcardIds'] ?? []),
       createdBy: map['createdBy'] ?? '',
       isPublished: map['isPublished'] ?? false,
+      isClosed: map['isClosed'] ?? false,
       createdAt: map['createdAt'],
       updatedAt: map['updatedAt'] ?? map['createdAt'],
     );
@@ -194,6 +197,7 @@ class Course extends BaseModel {
       'templateFlashcardIds': templateFlashcardIds,
       'createdBy': createdBy,
       'isPublished': isPublished,
+      'isClosed': isClosed,
       'createdAt': createdAt ?? Timestamp.now(),
       'updatedAt': updatedAt ?? Timestamp.now(),
     };
@@ -214,6 +218,7 @@ class Course extends BaseModel {
     List<String>? templateFlashcardIds,
     String? createdBy,
     bool? isPublished,
+    bool? isClosed,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) {
@@ -231,6 +236,7 @@ class Course extends BaseModel {
       templateFlashcardIds: templateFlashcardIds ?? this.templateFlashcardIds,
       createdBy: createdBy ?? this.createdBy,
       isPublished: isPublished ?? this.isPublished,
+      isClosed: isClosed ?? this.isClosed,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
