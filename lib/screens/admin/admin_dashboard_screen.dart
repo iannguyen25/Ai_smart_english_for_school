@@ -170,12 +170,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             // Thống kê tổng quan
             _buildOverviewStats(),
             
-            const SizedBox(height: 24),
+            // const SizedBox(height: 24),
             
-            // Thống kê tài nguyên
-            _buildResourcesStats(),
+            // // Thống kê tài nguyên
+            // _buildResourcesStats(),
             
-            const SizedBox(height: 24),
+            // const SizedBox(height: 24),
             
             // Bài học có vấn đề
             if (_resourcesReport.containsKey('problematicLessons') &&

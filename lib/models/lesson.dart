@@ -24,44 +24,65 @@ class VideoItem {
   final String url;
   final String? title;
   final String? description;
-  final Timestamp createdAt;
+  final ApprovalStatus approvalStatus;
+  final String? approvedBy;
+  final String? rejectionReason;
+  final DateTime? approvalTime;
 
   VideoItem({
     required this.url,
     this.title,
     this.description,
-    Timestamp? createdAt,
-  }) : createdAt = createdAt ?? Timestamp.now();
-
-  Map<String, dynamic> toMap() {
-    return {
-      'url': url,
-      'title': title,
-      'description': description,
-      'createdAt': createdAt,
-    };
-  }
+    this.approvalStatus = ApprovalStatus.pending,
+    this.approvedBy,
+    this.rejectionReason,
+    this.approvalTime,
+  });
 
   factory VideoItem.fromMap(Map<String, dynamic> map) {
     return VideoItem(
       url: map['url'] ?? '',
       title: map['title'],
       description: map['description'],
-      createdAt: map['createdAt'] ?? Timestamp.now(),
+      approvalStatus: ApprovalStatus.values.firstWhere(
+        (e) => e.name == (map['approvalStatus'] ?? 'pending'),
+        orElse: () => ApprovalStatus.pending,
+      ),
+      approvedBy: map['approvedBy'],
+      rejectionReason: map['rejectionReason'],
+      approvalTime: map['approvalTime']?.toDate(),
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'url': url,
+      'title': title,
+      'description': description,
+      'approvalStatus': approvalStatus.name,
+      'approvedBy': approvedBy,
+      'rejectionReason': rejectionReason,
+      'approvalTime': approvalTime,
+    };
   }
 
   VideoItem copyWith({
     String? url,
     String? title,
     String? description,
-    Timestamp? createdAt,
+    ApprovalStatus? approvalStatus,
+    String? approvedBy,
+    String? rejectionReason,
+    DateTime? approvalTime,
   }) {
     return VideoItem(
       url: url ?? this.url,
       title: title ?? this.title,
       description: description ?? this.description,
-      createdAt: createdAt ?? this.createdAt,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
+      approvedBy: approvedBy ?? this.approvedBy,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      approvalTime: approvalTime ?? this.approvalTime,
     );
   }
 }
