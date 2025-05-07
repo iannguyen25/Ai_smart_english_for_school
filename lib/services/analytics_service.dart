@@ -517,6 +517,34 @@ class AnalyticsService {
       final startDate = now.subtract(Duration(days: days));
       final startTimestamp = Timestamp.fromDate(startDate);
 
+      // Lấy tổng số người dùng
+      final totalUsersSnapshot = await _firestore
+          .collection('users')
+          .count()
+          .get();
+      final totalUsers = totalUsersSnapshot.count;
+
+      // Lấy tổng số lớp học
+      final totalClassroomsSnapshot = await _firestore
+          .collection('classrooms')
+          .count()
+          .get();
+      final totalClassrooms = totalClassroomsSnapshot.count;
+
+      // Lấy tổng số bài học
+      final totalLessonsSnapshot = await _firestore
+          .collection('lessons')
+          .count()
+          .get();
+      final totalLessons = totalLessonsSnapshot.count;
+
+      // Lấy tổng số flashcards
+      final totalFlashcardsSnapshot = await _firestore
+          .collection('flashcards')
+          .count()
+          .get();
+      final totalFlashcards = totalFlashcardsSnapshot.count;
+
       List<Map<String, dynamic>> pendingContent = [];
 
       // Lấy danh sách bài học chờ duyệt
@@ -618,6 +646,10 @@ class AnalyticsService {
       }
 
       return {
+        'totalUsers': totalUsers,
+        'totalClassrooms': totalClassrooms,
+        'totalLessons': totalLessons,
+        'totalFlashcards': totalFlashcards,
         'activeUsers': activeUsers.docs.length,
         'pendingContent': pendingContent,
         'topActiveClassrooms': topClassrooms,

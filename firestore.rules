@@ -111,14 +111,14 @@ service cloud.firestore {
     match /videos/{videoId} {
       allow read: if isAuthenticated() && (
         resource.data.isPublic == true || 
-        isOwner(resource.data.userId)
+        isOwner(resource.data.authorId)
       );
       
       allow create: if isAuthenticated() && 
-        request.resource.data.userId == request.auth.uid;
+        request.resource.data.authorId == request.auth.uid;
       
       allow update, delete: if isAuthenticated() && 
-        isOwner(resource.data.userId);
+        isOwner(resource.data.authorId);
     }
     
     match /materials/{materialId} {
@@ -228,7 +228,8 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId ||
         isAdmin()
       );
-      allow write: if isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isAdmin();
     }
     
     function isStudentInClassroom(classroomId) {
@@ -326,15 +327,17 @@ service cloud.firestore {
       
       // Cho phép cập nhật nếu:
       // 1. Đã đăng nhập
-      // 2. Là người tạo thảo luận
-      allow update: if isAuthenticated() && 
-        isOwner(resource.data.userId);
+      // 2. Là người tạo thảo luận hoặc là giáo viên của lớp
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId ||
+        (resource.data.classroomId != null && isTeacherOfClass(resource.data.classroomId))
+      );
       
       // Cho phép xóa nếu:
       // 1. Đã đăng nhập
       // 2. Là người tạo thảo luận hoặc là giáo viên của lớp
       allow delete: if isAuthenticated() && (
-        isOwner(resource.data.userId) ||
+        request.auth.uid == resource.data.userId ||
         (resource.data.classroomId != null && isTeacherOfClass(resource.data.classroomId))
       );
 

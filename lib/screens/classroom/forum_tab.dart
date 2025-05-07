@@ -576,6 +576,12 @@ class _ForumTabState extends State<ForumTab> {
                         ],
                       ),
                     ),
+                    // Options button
+                    if (widget.isTeacher || discussion.userId == _auth.currentUser?.uid)
+                      IconButton(
+                        icon: const Icon(Icons.more_vert),
+                        onPressed: () => _showDiscussionOptions(discussion),
+                      ),
                     // Pill showing the type
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

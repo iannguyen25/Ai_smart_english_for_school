@@ -1,8 +1,12 @@
+import 'package:base_flutter_framework/screens/flashcards/flashcard_detail_screen.dart';
+import 'package:base_flutter_framework/screens/lessons/lesson_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/analytics_service.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:base_flutter_framework/screens/admin/lesson_preview_screen.dart';
+import 'package:base_flutter_framework/screens/admin/flashcard_preview_screen.dart';
 
 class ContentManagementScreen extends StatefulWidget {
   const ContentManagementScreen({Key? key}) : super(key: key);
@@ -145,7 +149,7 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
             const SizedBox(height: 24),
             
             // Nội dung chờ duyệt
-            _buildPendingContentSection(),
+            _buildPendingContent(),
           ],
         ),
       ),
@@ -380,60 +384,20 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
     );
   }
 
-  Widget _buildPendingContentSection() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.pending_actions, color: Colors.purple),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Nội dung chờ duyệt',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildPendingContent(),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildPendingContent() {
-    if (!_systemOverview.containsKey('pendingContent') ||
+    if (_systemOverview['pendingContent'] == null || 
         (_systemOverview['pendingContent'] as List).isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade200),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
-            'Không có nội dung nào chờ duyệt',
+            'Không có nội dung chờ duyệt',
             style: TextStyle(
-              color: Colors.grey,
+              color: Colors.black54,
               fontSize: 16,
             ),
           ),
@@ -441,88 +405,250 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: (_systemOverview['pendingContent'] as List).length,
-      itemBuilder: (context, index) {
-        final content = _systemOverview['pendingContent'][index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade200),
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: Offset(0, 5),
           ),
-          child: Row(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      content['title'] ?? '',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${content['type'] == 'lesson' ? 'Bài học' : 'Flashcard'} • ${content['authorName'] ?? 'Không xác định'}',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.pending_actions,
+                  color: Colors.purple,
+                  size: 20,
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.check, color: Colors.green),
-                      onPressed: () => _approveResource('${content['type']}_${content['id']}'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.red),
-                      onPressed: () => _rejectResource('${content['type']}_${content['id']}'),
-                    ),
-                  ),
-                ],
+              SizedBox(width: 12),
+              Text(
+                'Nội dung chờ duyệt',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
-        );
-      },
+          SizedBox(height: 16),
+          ...(_systemOverview['pendingContent'] as List).map((content) {
+            return Container(
+              margin: EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.grey[800]!,
+                  width: 1,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    if (content['type'] == 'lesson') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LessonPreviewScreen(
+                            lessonId: content['id'],
+                          ),
+                        ),
+                      );
+                    } else if (content['type'] == 'flashcard') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FlashcardPreviewScreen(
+                            flashcardId: content['id'],
+                          ),
+                        ),
+                      );
+                    } else if (content['type'] == 'video') {
+                      // TODO: Thêm màn hình preview video nếu cần
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: content['type'] == 'lesson' 
+                                    ? Colors.blue.withOpacity(0.1)
+                                    : content['type'] == 'flashcard'
+                                        ? Colors.green.withOpacity(0.1)
+                                        : Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                content['type'] == 'lesson' 
+                                    ? 'Bài học' 
+                                    : content['type'] == 'flashcard'
+                                        ? 'Flashcard'
+                                        : 'Video',
+                                style: TextStyle(
+                                  color: content['type'] == 'lesson' 
+                                      ? Colors.blue
+                                      : content['type'] == 'flashcard'
+                                          ? Colors.green
+                                          : Colors.red,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                content['title'],
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Tác giả: ${content['authorName']}',
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (content['description'] != null && content['description'].isNotEmpty) ...[
+                          SizedBox(height: 8),
+                          Text(
+                            content['description'],
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 14,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => _rejectContent(content['id']),
+                              icon: Icon(
+                                Icons.close,
+                                color: Colors.red,
+                                size: 18,
+                              ),
+                              label: Text(
+                                'Từ chối',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.red.withOpacity(0.1),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            TextButton.icon(
+                              onPressed: () => _approveContent(content['id']),
+                              icon: Icon(
+                                Icons.check,
+                                color: Colors.green,
+                                size: 18,
+                              ),
+                              label: Text(
+                                'Duyệt',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.green.withOpacity(0.1),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ],
+      ),
     );
   }
 
-  Future<void> _approveResource(String resourceId) async {
+  Future<void> _approveContent(String contentId) async {
     try {
-      // Kiểm tra xem resourceId có chứa thông tin về loại nội dung không
-      final parts = resourceId.split('_');
+      // Kiểm tra xem contentId có chứa thông tin về loại nội dung không
+      final parts = contentId.split('_');
       if (parts.length != 2) {
-        throw Exception('Invalid resource ID format');
+        throw Exception('Invalid content ID format');
       }
 
       final type = parts[0];
       final id = parts[1];
-      final collection = type == 'lesson' ? 'lessons' : 'flashcards';
+      String collection;
+      
+      switch (type) {
+        case 'lesson':
+          collection = 'lessons';
+          break;
+        case 'flashcard':
+          collection = 'flashcards';
+          break;
+        case 'video':
+          collection = 'videos';
+          break;
+        default:
+          throw Exception('Invalid content type');
+      }
 
       await FirebaseFirestore.instance
           .collection(collection)
@@ -547,17 +673,31 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
     }
   }
 
-  Future<void> _rejectResource(String resourceId) async {
+  Future<void> _rejectContent(String contentId) async {
     try {
-      // Kiểm tra xem resourceId có chứa thông tin về loại nội dung không
-      final parts = resourceId.split('_');
+      // Kiểm tra xem contentId có chứa thông tin về loại nội dung không
+      final parts = contentId.split('_');
       if (parts.length != 2) {
-        throw Exception('Invalid resource ID format');
+        throw Exception('Invalid content ID format');
       }
 
       final type = parts[0];
       final id = parts[1];
-      final collection = type == 'lesson' ? 'lessons' : 'flashcards';
+      String collection;
+      
+      switch (type) {
+        case 'lesson':
+          collection = 'lessons';
+          break;
+        case 'flashcard':
+          collection = 'flashcards';
+          break;
+        case 'video':
+          collection = 'videos';
+          break;
+        default:
+          throw Exception('Invalid content type');
+      }
 
       await FirebaseFirestore.instance
           .collection(collection)
