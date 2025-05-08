@@ -179,8 +179,72 @@ class _MemberListScreenState extends State<MemberListScreen> {
       appBar: AppBar(
         title: const Text('Quản lý thành viên'),
       ),
+      floatingActionButton: _isTeacher ? FloatingActionButton(
+        onPressed: _showAddMemberDialog,
+        child: const Icon(Icons.person_add),
+        tooltip: 'Thêm thành viên',
+      ) : null,
       body: _buildBody(),
     );
+  }
+
+  Future<void> _showAddMemberDialog() async {
+    final emailController = TextEditingController();
+    
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Thêm thành viên'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Nhập email của người dùng muốn thêm vào lớp'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                hintText: 'example@email.com',
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Thêm'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true || emailController.text.isEmpty) return;
+
+    setState(() => _isLoading = true);
+    
+    try {
+      await _classroomService.inviteStudent(_classroom.id!, emailController.text);
+      await _loadMembers(); // Refresh the data
+      
+      Get.snackbar(
+        'Thành công',
+        'Đã gửi lời mời tham gia lớp học',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      Get.snackbar(
+        'Lỗi',
+        'Không thể thêm thành viên: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 
   Widget _buildBody() {

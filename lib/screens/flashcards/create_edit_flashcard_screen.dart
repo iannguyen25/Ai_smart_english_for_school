@@ -182,6 +182,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
           description: _descriptionController.text.trim(),
           isPublic: _isPublic,
           updatedAt: DateTime.now(),
+          approvalStatus: ApprovalStatus.pending,
         );
 
         await _flashcardService.updateFlashcard(updatedFlashcard);

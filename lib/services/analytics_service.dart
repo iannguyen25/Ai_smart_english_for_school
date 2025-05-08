@@ -357,7 +357,7 @@ class AnalyticsService {
       
       // Đếm số bài đã học
       int completedLessons = 0;
-      List<Map<String, dynamic>> lessonProgress = [];
+      List<Map<String, dynamic>> lessonProgressList = [];
       
       print('DEBUG: Fetching learning progress for each lesson');
       for (Lesson lesson in lessons) {
@@ -374,6 +374,7 @@ class AnalyticsService {
         bool isCompleted = false;
         int minutesSpent = 0;
         DateTime? lastAccessed;
+        double lessonProgress = 0.0;
         
         if (progress.docs.isNotEmpty) {
           final progressData = progress.docs.first.data();
@@ -392,23 +393,61 @@ class AnalyticsService {
           print('- Completed Items: $completedItems/$totalItems');
           print('- Completed Item IDs: $completedItemIds');
           
-          // Check status
+          // Calculate lesson progress
+          if (completedItemIds != null) {
+            // Nếu đã xem video
+            if (completedItemIds['video'] == true) {
+              lessonProgress += 0.4; // 40% cho việc xem video
+            }
+            
+            // Nếu đã làm bài tập
+            if (completedItemIds['exercises'] == true) {
+              lessonProgress += 0.6; // 60% cho việc làm bài tập
+            }
+            
+            // Nếu đã xem flashcard
+            if (completedItemIds['flashcards'] == true) {
+              lessonProgress += 0.3; // 30% cho việc xem flashcard
+            }
+          }
+          
+          // Check status and progress
           if (status == 'completed') {
             isCompleted = true;
+            lessonProgress = 1.0;
           }
           // Check progress percent
-          else if (progressPercent != null && progressPercent >= 100) {
-            isCompleted = true;
+          else if (progressPercent != null) {
+            lessonProgress = progressPercent / 100;
+            // Nếu tiến độ >= 80% thì coi như hoàn thành
+            if (progressPercent >= 80) {
+              isCompleted = true;
+            }
           }
           // Check completed items
-          else if (completedItems != null && totalItems != null && 
-                  completedItems > 0 && completedItems >= totalItems) {
-            isCompleted = true;
+          else if (completedItems != null && totalItems != null && totalItems > 0) {
+            lessonProgress = completedItems / totalItems;
+            // Nếu hoàn thành >= 80% số items thì coi như hoàn thành
+            if (completedItems >= (totalItems * 0.8)) {
+              isCompleted = true;
+            }
           }
           // Check completedItemIds
-          else if (completedItemIds != null && completedItemIds.isNotEmpty &&
-                  completedItemIds.values.every((v) => v == true)) {
-            isCompleted = true;
+          else if (completedItemIds != null && completedItemIds.isNotEmpty) {
+            // Nếu hoàn thành >= 80% các hoạt động thì coi như hoàn thành
+            final totalActivities = completedItemIds.length;
+            final completedActivities = completedItemIds.values.where((v) => v == true).length;
+            if (totalActivities > 0) {
+              lessonProgress = completedActivities / totalActivities;
+              if (lessonProgress >= 0.8) {
+                isCompleted = true;
+              }
+            }
+          }
+          
+          // Nếu có thời gian học tập nhưng chưa có tiến độ
+          if (minutesSpent > 0 && lessonProgress == 0) {
+            lessonProgress = 0.2; // Tối thiểu 20% nếu có học
           }
           
           minutesSpent = progressData['timeSpentMinutes'] ?? 0;
@@ -419,16 +458,30 @@ class AnalyticsService {
           if (isCompleted) {
             completedLessons++;
           }
+          
+          print('DEBUG: Lesson progress calculation:');
+          print('- Lesson: ${lesson.title}');
+          print('- Progress: ${(lessonProgress * 100).toStringAsFixed(1)}%');
+          print('- Is Completed: $isCompleted');
+          print('- Minutes Spent: $minutesSpent');
         }
         
-        lessonProgress.add({
+        lessonProgressList.add({
           'lessonId': lesson.id,
           'lessonTitle': lesson.title,
           'isCompleted': isCompleted,
           'minutesSpent': minutesSpent,
           'lastAccessed': lastAccessed,
+          'progress': lessonProgress,
         });
       }
+      
+      // Calculate overall completion rate
+      final completionRate = lessons.isNotEmpty ? completedLessons / lessons.length : 0.0;
+      
+      print('DEBUG: Final calculations:');
+      print('- Completed Lessons: $completedLessons/${lessons.length}');
+      print('- Completion Rate: $completionRate');
       
       print('DEBUG: Fetching badges');
       // Lấy thông tin huy hiệu đã đạt
@@ -537,8 +590,8 @@ class AnalyticsService {
         'joinedAt': user.createdAt,
         'completedLessons': completedLessons,
         'totalLessons': lessons.length,
-        'completionRate': lessons.isNotEmpty ? completedLessons / lessons.length : 0,
-        'lessonProgress': lessonProgress,
+        'completionRate': completionRate,
+        'lessonProgress': lessonProgressList,
         'earnedBadges': earnedBadges,
         'currentStreak': currentStreak,
         'longestStreak': longestStreak,

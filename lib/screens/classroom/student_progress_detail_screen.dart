@@ -52,6 +52,7 @@ class _StudentProgressDetailScreenState extends State<StudentProgressDetailScree
 
       print('DEBUG: Received student data:');
       print('- Progress: ${studentData['progress']}');
+      print('- Completion Rate: ${studentData['completionRate']}');
       print('- Completed Lessons: ${studentData['completedLessons']}/${studentData['totalLessons']}');
       print('- Total Time Spent: ${studentData['totalTimeSpent']}');
       print('- Last Accessed: ${studentData['lastAccessed']}');
@@ -144,7 +145,7 @@ class _StudentProgressDetailScreenState extends State<StudentProgressDetailScree
                                   Expanded(
                                     child: _buildStatCard(
                                       'Tỷ lệ hoàn thành',
-                                      '${(_studentData?['progress'] ?? 0.0 * 100).toStringAsFixed(1)}%',
+                                      '${((_studentData?['completionRate'] ?? 0.0) * 100).toStringAsFixed(1)}%',
                                       Icons.check_circle,
                                       Colors.green,
                                     ),

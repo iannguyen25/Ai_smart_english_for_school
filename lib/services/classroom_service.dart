@@ -477,4 +477,51 @@ class ClassroomService {
       return false;
     }
   }
+
+  // Mời học sinh tham gia lớp học
+  Future<void> inviteStudent(String classroomId, String email) async {
+    try {
+      // Tìm user theo email
+      final userQuery = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (userQuery.docs.isEmpty) {
+        throw 'Không tìm thấy người dùng với email này';
+      }
+
+      final userId = userQuery.docs.first.id;
+      final classroomDoc = await _classroomsRef.doc(classroomId).get();
+      final classroomData = classroomDoc.data() as Map<String, dynamic>;
+
+      // Kiểm tra xem đã là thành viên
+      final memberIds = List<String>.from(classroomData['memberIds'] ?? []);
+      final pendingMemberIds = List<String>.from(classroomData['pendingMemberIds'] ?? []);
+
+      if (memberIds.contains(userId)) {
+        throw 'Người dùng này đã là thành viên của lớp học';
+      }
+
+      if (pendingMemberIds.contains(userId)) {
+        // Nếu đang trong danh sách chờ, xóa khỏi danh sách chờ
+        await _classroomsRef.doc(classroomId).update({
+          'pendingMemberIds': FieldValue.arrayRemove([userId]),
+        });
+      }
+
+      // Thêm trực tiếp vào danh sách thành viên
+      await _classroomsRef.doc(classroomId).update({
+        'memberIds': FieldValue.arrayUnion([userId]),
+        'updatedAt': Timestamp.now(),
+      });
+    } catch (e) {
+      print('Error inviting student: $e');
+      if (e is String) {
+        rethrow;
+      }
+      throw 'Không thể mời học sinh tham gia lớp học';
+    }
+  }
 }
