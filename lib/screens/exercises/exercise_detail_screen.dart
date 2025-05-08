@@ -49,6 +49,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
   int _currentQuestionIndex = 0;
   Timer? _timer;
   int _remainingSeconds = 0;
+  final _timeStreamController = StreamController<int>.broadcast();
   Map<String, dynamic> _answers = {};
   bool _timeExpired = false;
   bool _isTeacherOrAdmin = false;
@@ -72,6 +73,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
   
   @override
   void dispose() {
+    _timeStreamController.close();
     if (_timer != null) {
       print('Cancelling timer on dispose');
       _timer?.cancel();
@@ -211,6 +213,9 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
     
     print('DEBUG: Starting timer with $_remainingSeconds seconds remaining');
     
+    // Emit initial time
+    _timeStreamController.add(_remainingSeconds);
+    
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         print('DEBUG: Widget not mounted, cancelling timer');
@@ -218,27 +223,47 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
         return;
       }
       
-      setState(() {
-        if (_remainingSeconds > 0) {
-          _remainingSeconds--;
-          if (_remainingSeconds % 30 == 0) {
-            print('DEBUG: Timer update - $_remainingSeconds seconds remaining');
-          }
-        } else {
-          print('DEBUG: Time expired, submitting attempt');
-          _timeExpired = true;
-          _timer?.cancel();
-          _timer = null;
-          _submitAttempt();
-        }
-      });
+      if (_remainingSeconds > 0) {
+        _remainingSeconds--;
+        _timeStreamController.add(_remainingSeconds);
+      } else {
+        print('DEBUG: Time expired, submitting attempt');
+        _timeExpired = true;
+        _timer?.cancel();
+        _timer = null;
+        _submitAttempt();
+      }
     });
   }
   
-  String get _formattedTime {
-    final minutes = (_remainingSeconds / 60).floor();
-    final seconds = _remainingSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  String _formatTime(int seconds) {
+    final minutes = (seconds / 60).floor();
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+  
+  Widget _buildTimerDisplay() {
+    return StreamBuilder<int>(
+      stream: _timeStreamController.stream,
+      initialData: _remainingSeconds,
+      builder: (context, snapshot) {
+        final seconds = snapshot.data ?? 0;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: seconds < 60 ? Colors.red : Colors.blue.shade700,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            _formatTime(seconds),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      },
+    );
   }
   
   Future<void> _updateAnswer(String questionId, dynamic answer) async {
@@ -409,20 +434,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 alignment: Alignment.center,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _remainingSeconds < 60 ? Colors.red : Colors.blue.shade700,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    _formattedTime,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                child: _buildTimerDisplay(),
               ),
             if (_isTeacherOrAdmin && _exercise != null) ...[
               IconButton(
@@ -513,10 +525,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
       controller: _tabController,
       children: [
         // Tab kiểm tra
-        _buildExamTab(),
-        
-        // Tab luyện tập
-        _buildPracticeView(),
+        _buildExamTab()
       ],
     );
   }
@@ -1613,107 +1622,6 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
     );
   }
 
-  // Future<void> _loadFlashcardItems() async {
-  //   print('Loading flashcard items for lesson: ${widget.lessonId}');
-  //   try {
-  //     setState(() {
-  //       _isLoading = true;
-  //       _errorMessage = null;
-  //     });
-
-  //     final flashcardService = FlashcardService();
-  //     final flashcards = await flashcardService.getLessonFlashcards(widget.lessonId);
-  //     print('Found ${flashcards.length} flashcards');
-
-  //     if (flashcards.isEmpty) {
-  //       print('No flashcards found for lesson, using mock data');
-  //       // Tạo dữ liệu mock
-  //       final mockItems = [
-  //         FlashcardItem(
-  //           flashcardId: 'mock_1',
-  //           question: 'Hello',
-  //           answer: 'Xin chào',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_2',
-  //           question: 'Good morning',
-  //           answer: 'Chào buổi sáng',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_3',
-  //           question: 'How are you?',
-  //           answer: 'Bạn khỏe không?',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_4',
-  //           question: 'Thank you',
-  //           answer: 'Cảm ơn',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_5',
-  //           question: 'Goodbye',
-  //           answer: 'Tạm biệt',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_6',
-  //           question: 'Please',
-  //           answer: 'Làm ơn',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_7',
-  //           question: 'Sorry',
-  //           answer: 'Xin lỗi',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_8',
-  //           question: 'Yes',
-  //           answer: 'Có',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_9',
-  //           question: 'No',
-  //           answer: 'Không',
-  //         ),
-  //         FlashcardItem(
-  //           flashcardId: 'mock_10',
-  //           question: 'I love you',
-  //           answer: 'Tôi yêu bạn',
-  //         ),
-  //       ];
-
-  //       setState(() {
-  //         _flashcardItems = mockItems;
-  //         _isLoading = false;
-  //       });
-  //       return;
-  //     }
-
-  //     // Lấy tất cả items của các flashcard
-  //     List<FlashcardItem> allItems = [];
-  //     for (var flashcard in flashcards) {
-  //       print('Loading items for flashcard: ${flashcard.id}');
-  //       if (flashcard.id != null) {
-  //         final items = await flashcardService.getFlashcardItems(flashcard.id!);
-  //         print('Found ${items.length} items for flashcard ${flashcard.id}');
-  //         allItems.addAll(items);
-  //       }
-  //     }
-
-  //     print('Total items loaded: ${allItems.length}');
-  //     setState(() {
-  //       _flashcardItems = allItems;
-  //       _isLoading = false;
-  //     });
-  //   } catch (e) {
-  //     print('Error loading flashcard items: $e');
-  //     setState(() {
-  //       _errorMessage = 'Không thể tải flashcard: ${e.toString()}';
-  //       _isLoading = false;
-  //       _flashcardItems = [];
-  //     });
-  //   }
-  // }
-
   Widget _buildPracticeView() {
     if (_flashcardItems.isEmpty) {
       return Center(
@@ -1865,25 +1773,6 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
                   ),
                 ],
               ),
-              if (_attempt?.status == AttemptStatus.inProgress) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.timer,
-                      size: 20,
-                      color: _remainingSeconds > 60 ? Colors.blue : Colors.red,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Thời gian còn lại: $_formattedTime',
-                      style: TextStyle(
-                        color: _remainingSeconds > 60 ? Colors.blue : Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
               if (remainingAttempts <= 0) ...[
                 const SizedBox(height: 12),
                 const Text(

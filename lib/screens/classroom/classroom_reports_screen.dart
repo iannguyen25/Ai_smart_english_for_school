@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -39,7 +40,7 @@ class _ClassroomReportsScreenState extends State<ClassroomReportsScreen> with Si
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _loadReportData();
   }
   
@@ -49,33 +50,48 @@ class _ClassroomReportsScreenState extends State<ClassroomReportsScreen> with Si
     super.dispose();
   }
   
-  void _viewStudentDetails(String studentId, String studentName) {
-    // TODO: Implement student detail view
-    Get.snackbar(
-      'Thông báo',
-      'Chức năng xem chi tiết học viên đang được phát triển',
-      snackPosition: SnackPosition.BOTTOM,
-    );
+  void _viewStudentDetails(String studentId, String classroomId, String studentName) {
+    Get.to(() => StudentReportDetailScreen(
+      classroomId: classroomId,
+      className: widget.className,
+      studentId: studentId,
+      studentName: studentName,
+    ));
   }
 
   Future<void> _loadReportData() async {
     setState(() => _reportState = ReportState.loading);
     
     try {
+      print('DEBUG: Starting to load report data');
+      
       // Tải tỷ lệ hoàn thành của lớp
+      print('DEBUG: Getting class completion rate');
       final completionRate = await _analyticsService.getClassCompletionRate(widget.classroomId);
+      print('DEBUG: Completion rate: $completionRate');
+      
       if (completionRate == null) {
         throw Exception('Completion rate is null');
       }
       
       // Tải tiến độ học tập của học sinh
+      print('DEBUG: Getting classroom data');
       final classroom = await _classroomService.getClassroom(widget.classroomId);
       if (classroom == null) throw Exception('Classroom not found');
       
+      // Lọc ra danh sách học sinh (loại bỏ giáo viên)
+      final studentIds = classroom.memberIds
+          .where((id) => id != classroom.teacherId)
+          .toList();
+      
+      print('DEBUG: Student count: ${studentIds.length}');
+      
       final List<Map<String, dynamic>> studentProgress = [];
-      for (String memberId in classroom.memberIds) {
-        final progress = await _analyticsService.getStudentProgressInClass(widget.classroomId, memberId);
+      for (String studentId in studentIds) {
+        print('DEBUG: Getting progress for student: $studentId');
+        final progress = await _analyticsService.getStudentProgressInClass(widget.classroomId, studentId);
         if (progress != null) {
+          print('DEBUG: Student progress: $progress');
           studentProgress.add(progress);
         }
       }
@@ -88,8 +104,13 @@ class _ClassroomReportsScreenState extends State<ClassroomReportsScreen> with Si
         return isValid;
       }).toList();
       
+      print('DEBUG: Valid student progress count: ${validStudentProgress.length}');
+      
       // Tải thống kê bài kiểm tra
+      print('DEBUG: Getting test statistics');
       final testStatistics = await _analyticsService.getClassTestStatistics(widget.classroomId);
+      print('DEBUG: Test statistics: $testStatistics');
+      
       if (testStatistics == null) {
         throw Exception('Test statistics is null');
       }
@@ -182,11 +203,7 @@ class _ClassroomReportsScreenState extends State<ClassroomReportsScreen> with Si
                     Tab(
                       icon: Icon(Icons.people),
                       text: 'Học viên',
-                    ),
-                    Tab(
-                      icon: Icon(Icons.analytics),
-                      text: 'Chi tiết',
-                    ),
+                    )
                   ],
                 ),
               ],
@@ -203,7 +220,6 @@ class _ClassroomReportsScreenState extends State<ClassroomReportsScreen> with Si
                       children: [
                         _buildOverviewTab(),
                         _buildStudentsTab(),
-                        _buildDetailsTab(),
                       ],
                     ),
           ),
@@ -604,7 +620,7 @@ class _ClassroomReportsScreenState extends State<ClassroomReportsScreen> with Si
               ),
               trailing: IconButton(
                 icon: const Icon(Icons.chevron_right),
-                onPressed: () => _viewStudentDetails(id, name),
+                onPressed: () => _viewStudentDetails(id, widget.classroomId, name),
               ),
             ),
           );
@@ -992,7 +1008,7 @@ class _StudentReportDetailScreenState extends State<StudentReportDetailScreen> {
                           Text(_studentData['email'] ?? 'N/A'),
                           const SizedBox(height: 4),
                           Text(
-                            'Tham gia từ: ${_formatDate(_studentData['joinedAt'])}',
+                            'Tham gia từ: ${_studentData['joinedAt'] != null ? _formatDate((_studentData['joinedAt'] as Timestamp).toDate()) : ''}',
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: 12,

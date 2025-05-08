@@ -71,7 +71,15 @@ service cloud.firestore {
         // Là admin
         isAdmin() ||
         // Là người tạo lớp
-				isOwner(resource.data.teacherId)
+        isOwner(resource.data.teacherId) ||
+        // Cho phép học sinh thêm mình vào pendingMemberIds
+        (
+          // Chỉ cho phép thêm vào pendingMemberIds
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingMemberIds']) &&
+          // Đảm bảo chỉ thêm ID của chính mình
+          request.resource.data.pendingMemberIds.hasAll(resource.data.pendingMemberIds) &&
+          request.resource.data.pendingMemberIds.hasOnly(resource.data.pendingMemberIds.concat([request.auth.uid]))
+        )
       );
       
       // Cho phép xoá nếu đăng nhập
@@ -188,13 +196,19 @@ service cloud.firestore {
 
       // Cho phép cập nhật nếu:
       // 1. Đã đăng nhập và là chủ sở hữu của tiến độ học tập
-      allow update: if isAuthenticated() &&
-        ((resource == null) || resource.data.userId == request.auth.uid);
+      // 2. Hoặc là giáo viên của lớp học
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isTeacherOfClass(resource.data.classroomId)
+      );
 
       // Cho phép xóa nếu:
       // 1. Đã đăng nhập và là chủ sở hữu của tiến độ học tập
-      allow delete: if isAuthenticated() &&
-        ((resource == null) || resource.data.userId == request.auth.uid);
+      // 2. Hoặc là giáo viên của lớp học
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isTeacherOfClass(resource.data.classroomId)
+      );
     }
 
     // Bảo đảm tương thích với cả hai collection name
@@ -361,8 +375,17 @@ service cloud.firestore {
     // User badges collection
     match /user_badges/{userBadgeId} {
       allow read: if isAuthenticated() && (
+        // User can read their own badges
         request.auth.uid == resource.data.userId ||
-        isAdmin()
+        // Admin can read all badges
+        isAdmin() ||
+        // Teacher can read badges of their students
+        isTeacher() ||
+        // Teacher can read badges of students in their classroom
+        (
+          resource.data.classroomId != null && 
+          isTeacherOfClass(resource.data.classroomId)
+        )
       );
       allow create: if isAuthenticated() && 
         request.resource.data.userId == request.auth.uid;
@@ -370,6 +393,72 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId ||
         isAdmin()
       );
+    }
+
+    // User streaks collection
+    match /user_streaks/{userId} {
+      allow read: if isAuthenticated() && (
+        // User can read their own streaks
+        request.auth.uid == userId ||
+        // Admin can read all streaks
+        isAdmin() ||
+        // Teacher can read streaks of their students
+        isTeacher()
+      );
+      allow write: if isAuthenticated() && (
+        // User can write their own streaks
+        request.auth.uid == userId ||
+        // Admin can write all streaks
+        isAdmin()
+      );
+    }
+
+    // Quizzes collection
+    match /quizzes/{quizId} {
+      allow read: if isAuthenticated() && (
+        // Allow if user has access to the lesson
+        resource.data.lessonId != null && (
+          isTeacherOfClass(getLessonClassroomId(resource.data.lessonId)) ||
+          isStudentInClassroom(getLessonClassroomId(resource.data.lessonId))
+        )
+      );
+      
+      // Only teachers and admins can create/update/delete quizzes
+      allow create, update, delete: if isAuthenticated() && (
+        isTeacher() || isAdmin()
+      );
+    }
+
+    match /quiz_attempts/{attemptId} {
+      // Allow read if authenticated user is:
+      // 1. The owner of the attempt
+      // 2. A teacher of the classroom
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId ||
+        resource.data.classroomId != null && isTeacherOfClass(resource.data.classroomId)
+      );
+
+      // Allow create if the user is the owner
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+
+      // Allow update if the user is the owner
+      allow update: if isAuthenticated() && 
+        request.auth.uid == resource.data.userId;
+    }
+
+    // User tokens collection for notifications
+    match /user_tokens/{tokenId} {
+      // Allow read if authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow create/update if the user is the owner of the token
+      allow create, update: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Allow delete if the user is the owner of the token
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
     }
   }
 }

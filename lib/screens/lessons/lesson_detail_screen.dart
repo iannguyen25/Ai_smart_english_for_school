@@ -25,6 +25,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../exercises/exercise_detail_screen.dart';
 import '../../services/analytics_service.dart';
+import '../classroom/student_progress_detail_screen.dart';
 
 class LessonDetailScreen extends StatefulWidget {
   final String lessonId;
@@ -747,7 +748,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
               ),
             ],
           ),
-          if (_lesson != null) _buildEditButton(),
+          if (_lesson != null && _isAdmin) _buildEditButton(),
         ],
       ),
       body: Column(
@@ -2968,6 +2969,40 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStudentProgressCard(Map<String, dynamic> student) {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundImage: student['photoUrl'] != null
+              ? NetworkImage(student['photoUrl'])
+              : null,
+          child: student['photoUrl'] == null
+              ? Text(student['name'][0].toUpperCase())
+              : null,
+        ),
+        title: Text(student['name']),
+        subtitle: Text(
+          'Hoàn thành: ${(student['progress'] * 100).toStringAsFixed(1)}%',
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.analytics),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => StudentProgressDetailScreen(
+                  studentId: student['id'],
+                  classroomId: widget.classroomId,
+                  studentName: student['name'],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

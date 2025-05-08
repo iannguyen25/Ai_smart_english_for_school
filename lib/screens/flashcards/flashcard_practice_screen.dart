@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../models/flashcard.dart';
 import '../../models/flashcard_item.dart';
+import '../../services/analytics_service.dart';
+import '../../services/auth_service.dart';
 
 class FlashcardPracticeScreen extends StatefulWidget {
   final Flashcard flashcard;
@@ -178,6 +180,20 @@ class _FlashcardPracticeScreenState extends State<FlashcardPracticeScreen> {
       if (_currentIndex >= widget.items.length - 1) {
         print('Showing completion screen');
         _isCompleted = true;
+        
+        // Track completion
+        final analyticsService = AnalyticsService();
+        analyticsService.trackFlashcardActivity(
+          userId: AuthService().currentUser?.id ?? '',
+          lessonId: widget.flashcard.lessonId ?? '',
+          classroomId: widget.flashcard.classroomId ?? '',
+          flashcardId: widget.flashcard.id ?? '',
+          flashcardTitle: widget.flashcard.title,
+          action: 'completed',
+          totalCards: widget.items.length,
+          viewedCards: widget.items.length,
+          timestamp: DateTime.now(),
+        );
       } else {
         _nextCard();
       }

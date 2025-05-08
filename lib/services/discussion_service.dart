@@ -222,33 +222,8 @@ class DiscussionService {
 
       await docRef.set(discussion.toMap());
 
-      // Gửi thông báo
-      final notification = {
-        'classroomId': classroomId,
-        'title': 'Thảo luận mới',
-        'body': '${user?.fullName ?? 'Người dùng'} đã tạo một thảo luận mới: ${content.substring(0, content.length > 50 ? 50 : content.length)}${content.length > 50 ? '...' : ''}',
-        'type': 'discussion',
-        'discussionId': docRef.id,
-        'createdAt': Timestamp.now(),
-      };
-
-      // Lưu thông báo vào Firestore
-      await _firestore.collection('notifications').add(notification);
-
-      // Gửi thông báo qua FCM
-      await _firestore.collection('fcm_messages').add({
-        'topic': 'classroom_$classroomId',
-        'notification': {
-          'title': notification['title'],
-          'body': notification['body'],
-        },
-        'data': {
-          'type': 'discussion',
-          'discussionId': docRef.id,
-          'classroomId': classroomId,
-        },
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Bỏ qua phần tạo notification và FCM message vì không có quyền
+      // TODO: Implement notification system with proper permissions
 
       return discussion;
     } catch (e) {

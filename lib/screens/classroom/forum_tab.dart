@@ -576,6 +576,12 @@ class _ForumTabState extends State<ForumTab> {
                         ],
                       ),
                     ),
+                    // Menu button
+                    if (widget.isTeacher || discussion.userId == _auth.currentUser?.uid)
+                      IconButton(
+                        icon: const Icon(Icons.more_vert),
+                        onPressed: () => _showDiscussionOptions(discussion),
+                      ),
                     // Pill showing the type
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -735,11 +741,14 @@ class _ForumTabState extends State<ForumTab> {
       dev.log('Discussion created successfully', name: 'ForumTab');
       dev.log('New discussion ID: ${newDiscussion.id}', name: 'ForumTab');
       
-                Get.snackbar(
-                  'Thành công',
-                  'Đã tạo chủ đề thảo luận mới',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
+      // Đóng dialog
+      Navigator.pop(context);
+      
+      Get.snackbar(
+        'Thành công',
+        'Đã tạo chủ đề thảo luận mới',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } catch (e) {
       dev.log('Error creating discussion: $e', name: 'ForumTab', error: e);
       Get.snackbar(
@@ -766,6 +775,10 @@ class _ForumTabState extends State<ForumTab> {
       );
       
       dev.log('Discussion updated successfully', name: 'ForumTab');
+      
+      // Đóng dialog
+      Navigator.pop(context);
+      
       Get.snackbar(
         'Thành công',
         'Đã cập nhật chủ đề thảo luận',
