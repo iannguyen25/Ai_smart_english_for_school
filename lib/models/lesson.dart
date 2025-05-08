@@ -109,20 +109,24 @@ class Lesson extends BaseModel {
         );
 
   factory Lesson.fromMap(Map<String, dynamic> map, String id) {
-    // Handle migration from old videoUrl to new videos array
     List<VideoItem> videos = [];
     
-    // Migrate from old videoUrl field if it exists
-    if (map['videoUrl'] != null && map['videoUrl'].isNotEmpty) {
+    // Handle new VideoItem format
+    if (map['videoItems'] is List) {
+      videos = (map['videoItems'] as List)
+          .map((item) => VideoItem.fromMap(item))
+          .toList();
+    }
+    // Handle old videoUrl field if it exists
+    else if (map['videoUrl'] != null && map['videoUrl'].isNotEmpty) {
       videos.add(VideoItem(
         url: map['videoUrl'],
         title: 'Video bài giảng',
         description: 'Video bài giảng chính',
       ));
     }
-    
     // Handle old videos string list if present
-    if (map['videos'] is List && map['videos'].isNotEmpty) {
+    else if (map['videos'] is List && map['videos'].isNotEmpty) {
       if (map['videos'][0] is String) {
         // Convert old string list to VideoItem objects
         videos.addAll(
@@ -132,13 +136,6 @@ class Lesson extends BaseModel {
           )).toList()
         );
       }
-    }
-    
-    // Handle new VideoItem format
-    if (map['videoItems'] is List) {
-      videos = (map['videoItems'] as List)
-          .map((item) => VideoItem.fromMap(item))
-          .toList();
     }
     
     return Lesson(
@@ -470,7 +467,14 @@ class Lesson extends BaseModel {
         'classroomId': classroomId,
         'orderIndex': orderIndex,
         'estimatedMinutes': estimatedMinutes,
-        'videos': videoUrl != null ? [videoUrl] : [],
+        'videoItems': videoUrl != null ? [
+          {
+            'url': videoUrl,
+            'title': 'Video bài giảng',
+            'description': 'Video bài giảng chính',
+            'createdAt': Timestamp.now(),
+          }
+        ] : [],
         'flashcardIds': flashcardIds,
         'exerciseIds': exerciseIds,
         'completedBy': [],

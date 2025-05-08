@@ -46,7 +46,7 @@ class FlashcardItem {
       questionCaption: map['questionCaption'],
       answerCaption: map['answerCaption'],
       type: FlashcardItemType.values.firstWhere(
-        (e) => e.toString() == map['type'],
+        (e) => e.name == map['type'],
         orElse: () => FlashcardItemType.textToText,
       ),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
@@ -63,7 +63,7 @@ class FlashcardItem {
       'answerImage': answerImage,
       'questionCaption': questionCaption,
       'answerCaption': answerCaption,
-      'type': type.toString(),
+      'type': type.name,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

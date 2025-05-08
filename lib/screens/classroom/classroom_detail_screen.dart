@@ -1311,20 +1311,20 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (_isTeacher)
-                      ElevatedButton.icon(
-                        onPressed: () => _showCreateFolderDialog(lesson),
-                        icon: const Icon(Icons.create_new_folder, size: 16),
-                        label: const Text('Thêm thư mục'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey.shade200,
-                          foregroundColor: Colors.black87,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                    // if (_isTeacher)
+                    //   ElevatedButton.icon(
+                    //     onPressed: () => _showCreateFolderDialog(lesson),
+                    //     icon: const Icon(Icons.create_new_folder, size: 16),
+                    //     label: const Text('Thêm thư mục'),
+                    //     style: ElevatedButton.styleFrom(
+                    //       backgroundColor: Colors.grey.shade200,
+                    //       foregroundColor: Colors.black87,
+                    //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(12),
+                    //       ),
+                    //     ),
+                    //   ),
                     ElevatedButton.icon(
                       onPressed: () => _viewLessonDetail(lesson),
                       icon: const Icon(Icons.visibility, size: 16, color: Colors.white),

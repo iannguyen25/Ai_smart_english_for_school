@@ -105,11 +105,21 @@ class ClassroomService {
       final classroomDoc = querySnapshot.docs.first;
       final classroomData = classroomDoc.data();
       print('Found classroom: ${classroomData['name']}');
+      print('Classroom data: $classroomData');
 
       // Kiểm tra xem đã là thành viên
       final memberIds = List<String>.from(classroomData['memberIds'] ?? []);
+      final pendingMemberIds = List<String>.from(classroomData['pendingMemberIds'] ?? []);
+      print('Current memberIds: $memberIds');
+      print('Current pendingMemberIds: $pendingMemberIds');
+      print('User ID: $userId');
+
       if (memberIds.contains(userId)) {
         throw 'Bạn đã là thành viên của lớp học này';
+      }
+
+      if (pendingMemberIds.contains(userId)) {
+        throw 'Bạn đã gửi yêu cầu tham gia lớp học này';
       }
 
       // Nếu lớp công khai, thêm vào memberIds

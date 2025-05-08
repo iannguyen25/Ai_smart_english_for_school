@@ -186,7 +186,8 @@ class AuthService {
         updatedAt: Timestamp.now(),
       );
 
-      _currentUser = user;
+      // Không tự động đăng nhập sau khi tạo tài khoản
+      // _currentUser = user;
       return AuthResult(success: true, user: user);
     } on firebase_auth.FirebaseAuthException catch (e) {
       print(

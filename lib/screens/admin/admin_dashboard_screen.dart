@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../services/analytics_service.dart';
+import '../../services/auth_service.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
@@ -18,6 +19,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final AnalyticsService _analyticsService = AnalyticsService();
+  final AuthService _authService = AuthService();
   
   bool _isLoading = true;
   
@@ -657,7 +659,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.check, color: Colors.green),
-                      onPressed: () => _approveResource('${content['type']}_${content['id']}'),
+                      onPressed: () => _approveContent('${content['type']}_${content['id']}'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -668,7 +670,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.close, color: Colors.red),
-                      onPressed: () => _rejectResource('${content['type']}_${content['id']}'),
+                      onPressed: () => _rejectContent('${content['type']}_${content['id']}'),
                     ),
                   ),
                 ],
@@ -681,9 +683,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // Duyệt nội dung
-  Future<void> _approveResource(String resourceId) async {
+  Future<void> _approveContent(String contentId) async {
     try {
-      await _analyticsService.approveContent(resourceId);
+      // Kiểm tra quyền người dùng
+      final currentUser = await _authService.getCurrentUserProfile();
+      print('Current user role: ${currentUser?.roleId}');
+      
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      if (currentUser.roleId != 'admin' && currentUser.roleId != 'teacher') {
+        throw Exception('User does not have permission to approve content');
+      }
+      
+      await _analyticsService.approveContent(contentId);
       _loadDashboardData(); // Tải lại dữ liệu
       if (mounted) {
         SnackbarHelper.showSuccess(
@@ -692,6 +706,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       }
     } catch (e) {
+      print('Error approving content: $e');
       if (mounted) {
         SnackbarHelper.showError(
           context: context,
@@ -702,9 +717,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // Từ chối nội dung
-  Future<void> _rejectResource(String resourceId) async {
+  Future<void> _rejectContent(String contentId) async {
     try {
-      await _analyticsService.rejectContent(resourceId);
+      // Kiểm tra quyền người dùng
+      final currentUser = await _authService.getCurrentUserProfile();
+      print('Current user role: ${currentUser?.roleId}');
+      
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      if (currentUser.roleId != 'admin' && currentUser.roleId != 'teacher') {
+        throw Exception('User does not have permission to reject content');
+      }
+      
+      await _analyticsService.rejectContent(contentId);
       _loadDashboardData(); // Tải lại dữ liệu
       if (mounted) {
         SnackbarHelper.showSuccess(
@@ -713,6 +740,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       }
     } catch (e) {
+      print('Error rejecting content: $e');
       if (mounted) {
         SnackbarHelper.showError(
           context: context,

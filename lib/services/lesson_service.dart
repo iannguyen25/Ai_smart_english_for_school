@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/lesson.dart';
 import '../models/learning_progress.dart';
 import '../models/app_user.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LessonService {
   // Singleton pattern
@@ -101,6 +102,33 @@ class LessonService {
   // Cập nhật bài học
   Future<void> updateLesson(String id, Lesson lesson) async {
     try {
+      print('=== Debug Permission Info ===');
+      print('Lesson ID: $id');
+      print('Classroom ID: ${lesson.classroomId}');
+      print('Current user: ${FirebaseAuth.instance.currentUser?.uid}');
+      
+      // Check if user is authenticated
+      final isAuth = FirebaseAuth.instance.currentUser != null;
+      print('Is authenticated: $isAuth');
+      
+      // Check if course is closed
+      final classroomDoc = await _firestore.collection('classrooms').doc(lesson.classroomId).get();
+      final courseId = classroomDoc.data()?['courseId'];
+      final courseDoc = await _firestore.collection('courses').doc(courseId).get();
+      final isClosed = courseDoc.data()?['isClosed'] == true;
+      print('Is course closed: $isClosed');
+      
+      // Check if user is teacher
+      final isTeacher = classroomDoc.data()?['teacherId'] == FirebaseAuth.instance.currentUser?.uid;
+      print('Is teacher: $isTeacher');
+      
+      // Check if user is admin
+      final userDoc = await _firestore.collection('users').doc(FirebaseAuth.instance.currentUser?.uid).get();
+      final isAdmin = userDoc.data()?['roleId'] == 'admin';
+      print('Is admin: $isAdmin');
+      
+      print('=== End Debug Info ===');
+      
       await _lessonsCollection.doc(id).update(lesson.toMap());
     } catch (e) {
       print('Error updating lesson: $e');

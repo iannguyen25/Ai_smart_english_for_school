@@ -119,11 +119,15 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
     bool hasValidItems = false;
     String? validationError;
     
+    print('=== Validating Flashcard Items ===');
     for (var item in _items) {
+      print('Item type: ${item.type}');
+      print('Item data: ${item.toMap()}');
+      
       switch (item.type) {
         case FlashcardItemType.textToText:
-      if (item.question.isNotEmpty && item.answer.isNotEmpty) {
-        hasValidItems = true;
+          if (item.question.isNotEmpty && item.answer.isNotEmpty) {
+            hasValidItems = true;
           }
           break;
         case FlashcardItemType.imageToText:
@@ -134,13 +138,16 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
           }
           break;
         case FlashcardItemType.imageToImage:
+          print('Checking imageToImage item:');
+          print('Question image: ${item.questionImage}');
+          print('Answer image: ${item.answerImage}');
           if (item.questionImage != null && item.questionImage!.isNotEmpty &&
               item.answerImage != null && item.answerImage!.isNotEmpty) {
             hasValidItems = true;
           } else {
             validationError = 'Vui lòng tải lên cả ảnh từ vựng và ảnh minh họa cho thẻ kiểu Ảnh - Ảnh';
           }
-        break;
+          break;
       }
       if (validationError != null) break;
     }
@@ -168,6 +175,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
       final userId = _authService.currentUser!.id!;
 
       if (_isEditMode && widget.flashcard?.id != null) {
+        print('=== Updating Existing Flashcard ===');
         // Cập nhật bộ thẻ hiện có
         final updatedFlashcard = widget.flashcard!.copyWith(
           title: _titleController.text.trim(),
@@ -180,18 +188,32 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
 
         // Cập nhật hoặc tạo các thẻ
         for (var item in _items) {
-          if (item.question.isEmpty && item.answer.isEmpty) continue;
+          // Bỏ qua các thẻ trống
+          if (item.type == FlashcardItemType.textToText && 
+              item.question.isEmpty && item.answer.isEmpty) continue;
+          if (item.type == FlashcardItemType.imageToText && 
+              (item.questionImage == null || item.questionImage!.isEmpty || item.answer.isEmpty)) continue;
+          if (item.type == FlashcardItemType.imageToImage && 
+              (item.questionImage == null || item.questionImage!.isEmpty || 
+               item.answerImage == null || item.answerImage!.isEmpty)) continue;
 
           if (item.id != null) {
+            print('Updating existing item: ${item.id}');
+            print('Item type: ${item.type}');
+            print('Item data: ${item.toMap()}');
             // Cập nhật thẻ hiện có
             await _flashcardService.updateFlashcardItem(item);
           } else {
+            print('Creating new item for existing flashcard');
+            print('Item type: ${item.type}');
+            print('Item data: ${item.toMap()}');
             // Tạo thẻ mới
             final newItem = item.copyWith(flashcardId: widget.flashcard!.id!);
             await _flashcardService.createFlashcardItem(newItem);
           }
         }
       } else {
+        print('=== Creating New Flashcard ===');
         // Tạo bộ thẻ mới
         final newFlashcard = Flashcard(
           title: _titleController.text.trim(),
@@ -205,11 +227,22 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
 
         // Tạo flashcard trước để lấy ID
         final flashcardId = await _flashcardService.createFlashcard(newFlashcard);
+        print('Created flashcard with ID: $flashcardId');
 
         // Tạo các thẻ với flashcardId mới
         for (var item in _items) {
-          if (item.question.isEmpty && item.answer.isEmpty) continue;
+          // Bỏ qua các thẻ trống
+          if (item.type == FlashcardItemType.textToText && 
+              item.question.isEmpty && item.answer.isEmpty) continue;
+          if (item.type == FlashcardItemType.imageToText && 
+              (item.questionImage == null || item.questionImage!.isEmpty || item.answer.isEmpty)) continue;
+          if (item.type == FlashcardItemType.imageToImage && 
+              (item.questionImage == null || item.questionImage!.isEmpty || 
+               item.answerImage == null || item.answerImage!.isEmpty)) continue;
 
+          print('Creating new item for new flashcard');
+          print('Item type: ${item.type}');
+          print('Item data: ${item.toMap()}');
           final newItem = item.copyWith(flashcardId: flashcardId);
           await _flashcardService.createFlashcardItem(newItem);
         }
@@ -222,6 +255,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
+      print('Error saving flashcard: $e');
       setState(() {
         _errorMessage = 'Không thể lưu bộ thẻ: ${e.toString()}';
         _isLoading = false;

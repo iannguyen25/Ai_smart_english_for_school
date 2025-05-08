@@ -98,13 +98,34 @@ class _FillInTheBlankGameState extends State<FillInTheBlankGame> {
     print('Game initialized with ${_selectedItems.length} questions\n');
   }
 
+  String _normalizeText(String text) {
+    // Chuyển về chữ thường
+    text = text.toLowerCase();
+    
+    // Loại bỏ dấu tiếng Việt
+    text = text.replaceAll(RegExp(r'[àáạảãâầấậẩẫăằắặẳẵ]'), 'a');
+    text = text.replaceAll(RegExp(r'[èéẹẻẽêềếệểễ]'), 'e');
+    text = text.replaceAll(RegExp(r'[ìíịỉĩ]'), 'i');
+    text = text.replaceAll(RegExp(r'[òóọỏõôồốộổỗơờớợởỡ]'), 'o');
+    text = text.replaceAll(RegExp(r'[ùúụủũưừứựửữ]'), 'u');
+    text = text.replaceAll(RegExp(r'[ỳýỵỷỹ]'), 'y');
+    text = text.replaceAll(RegExp(r'[đ]'), 'd');
+    
+    // Loại bỏ các ký tự đặc biệt và dấu câu
+    text = text.replaceAll(RegExp(r'[^a-z0-9\s]'), '');
+    
+    // Chuẩn hóa khoảng trắng (loại bỏ khoảng trắng thừa)
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    
+    return text;
+  }
+
   void _checkAnswer() {
     if (_userAnswer.trim().isEmpty) return;
 
     setState(() {
       _showResult = true;
-      _isCorrect = _userAnswer.trim().toLowerCase() == 
-          _selectedItems[_currentIndex].answer.toLowerCase();
+      _isCorrect = _normalizeText(_userAnswer) == _normalizeText(_selectedItems[_currentIndex].answer);
       
       if (_isCorrect && !_answered[_currentIndex]) {
         _score += 10;

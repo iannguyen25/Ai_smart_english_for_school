@@ -226,7 +226,18 @@ class FlashcardService {
   // Create a new flashcard item
   Future<String> createFlashcardItem(FlashcardItem item) async {
     try {
+      print('=== Creating Flashcard Item ===');
+      print('Item data: ${item.toMap()}');
+      print('Type: ${item.type}');
+      print('Type name: ${item.type.name}');
+      
       final docRef = await _flashcardItemsRef.add(item.toMap());
+      print('Created document with ID: ${docRef.id}');
+      
+      // Verify the saved data
+      final savedDoc = await docRef.get();
+      print('Saved data: ${savedDoc.data()}');
+      
       return docRef.id;
     } catch (e) {
       print('Error creating flashcard item: $e');
@@ -237,7 +248,17 @@ class FlashcardService {
   // Update an existing flashcard item
   Future<void> updateFlashcardItem(FlashcardItem item) async {
     try {
+      print('=== Updating Flashcard Item ===');
+      print('Item ID: ${item.id}');
+      print('Item data: ${item.toMap()}');
+      print('Type: ${item.type}');
+      print('Type name: ${item.type.name}');
+      
       await _flashcardItemsRef.doc(item.id).update(item.toMap());
+      
+      // Verify the updated data
+      final updatedDoc = await _flashcardItemsRef.doc(item.id).get();
+      print('Updated data: ${updatedDoc.data()}');
     } catch (e) {
       print('Error updating flashcard item: $e');
       throw 'Không thể cập nhật thẻ';
