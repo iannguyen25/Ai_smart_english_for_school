@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/analytics_service.dart';
 import '../../utils/snackbar_helper.dart';
+import 'lesson_preview_screen.dart';
+import 'flashcard_preview_screen.dart';
 
 class ContentManagementScreen extends StatefulWidget {
   const ContentManagementScreen({Key? key}) : super(key: key);
@@ -160,6 +162,8 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
         'new': _resourcesReport['newLessons'] ?? 0,
         'icon': Icons.book,
         'color': Colors.blue,
+        'type': 'lessons',
+        'details': _resourcesReport['lessonDetails'] ?? [],
       },
       {
         'title': 'Flashcards',
@@ -167,6 +171,8 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
         'new': _resourcesReport['newFlashcards'] ?? 0,
         'icon': Icons.card_membership,
         'color': Colors.green,
+        'type': 'flashcards',
+        'details': _resourcesReport['flashcardDetails'] ?? [],
       },
       {
         'title': 'Bài tập',
@@ -174,6 +180,8 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
         'new': _resourcesReport['newExercises'] ?? 0,
         'icon': Icons.assignment,
         'color': Colors.orange,
+        'type': 'exercises',
+        'details': _resourcesReport['exerciseDetails'] ?? [],
       },
       {
         'title': 'Bài kiểm tra',
@@ -181,6 +189,8 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
         'new': _resourcesReport['newQuizzes'] ?? 0,
         'icon': Icons.quiz,
         'color': Colors.purple,
+        'type': 'quizzes',
+        'details': _resourcesReport['quizDetails'] ?? [],
       },
     ];
     
@@ -215,66 +225,180 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            ...newResourcesData.map((resource) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: (resource['color'] as Color).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      resource['icon'] as IconData,
-                      color: resource['color'] as Color,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      resource['title'] as String,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      (resource['total'] as int).toString(),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  if ((resource['new'] as int) > 0)
+            ...newResourcesData.map((resource) => InkWell(
+              onTap: () => _showResourceDetailsDialog(
+                resource['title'] as String,
+                resource['type'] as String,
+                resource['details'] as List,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.green.shade200),
+                        color: (resource['color'] as Color).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: Icon(
+                        resource['icon'] as IconData,
+                        color: resource['color'] as Color,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 3,
                       child: Text(
-                        '+${resource['new']}',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                        resource['title'] as String,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                ],
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        (resource['total'] as int).toString(),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if ((resource['new'] as int) > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Text(
+                          '+${resource['new']}',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.chevron_right,
+                      color: Colors.grey.shade400,
+                    ),
+                  ],
+                ),
               ),
             )).toList(),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showResourceDetailsDialog(String title, String type, List details) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Chi tiết $title',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (details.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      'Không có dữ liệu chi tiết',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: details.map<Widget>((detail) {
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            title: Text(
+                              detail['classroomName'] ?? 'Lớp không xác định',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Tổng số: ${detail['total']}',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ),
+                                if ((detail['new'] as int) > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.green.shade200),
+                                    ),
+                                    child: Text(
+                                      '+${detail['new']}',
+                                      style: TextStyle(
+                                        color: Colors.green.shade700,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -458,25 +582,48 @@ class _ContentManagementScreenState extends State<ContentManagementScreen> {
           child: Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      content['title'] ?? '',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                child: GestureDetector(
+                  onTap: () {
+                    if (content['type'] == 'lesson') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LessonPreviewScreen(
+                            lessonId: content['id'],
+                          ),
+                        ),
+                      );
+                    } else if (content['type'] == 'flashcard') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FlashcardPreviewScreen(
+                            flashcardId: content['id'],
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        content['title'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${content['type'] == 'lesson' ? 'Bài học' : 'Flashcard'} • ${content['authorName'] ?? 'Không xác định'}',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
+                      const SizedBox(height: 4),
+                      Text(
+                        '${content['type'] == 'lesson' ? 'Bài học' : 'Flashcard'} • ${content['authorName'] ?? 'Không xác định'}',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               Row(

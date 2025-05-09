@@ -1963,7 +1963,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
           );
         }
         
-        return ListView.builder(
+        return  ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: flashcards.length + (_isTeacher || _isAdmin ? 1 : 0),
           itemBuilder: (context, index) {
@@ -2110,7 +2110,6 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (_isCourseClosed)
                   ElevatedButton.icon(
                     onPressed: _showAddExerciseDialog,
                     icon: const Icon(Icons.add),
@@ -2612,73 +2611,158 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     final timeLimitController = TextEditingController();
+    DateTime? startDate;
+    DateTime? endDate;
 
     Get.dialog(
-      AlertDialog(
-        title: const Text('Thêm bài tập'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(
-                labelText: 'Tiêu đề bài tập',
-                hintText: 'Nhập tiêu đề bài tập',
-              ),
+      StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Thêm bài tập'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tiêu đề bài tập',
+                    hintText: 'Nhập tiêu đề bài tập',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Mô tả',
+                    hintText: 'Nhập mô tả ngắn gọn',
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: timeLimitController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Thời gian làm bài (phút)',
+                    hintText: 'Nhập thời gian làm bài',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Start date picker
+                ListTile(
+                  title: const Text('Ngày bắt đầu'),
+                  subtitle: Text(startDate != null 
+                    ? '${startDate!.day}/${startDate!.month}/${startDate!.year} ${startDate!.hour}:${startDate!.minute.toString().padLeft(2, '0')}'
+                    : 'Chọn ngày bắt đầu'),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (time != null) {
+                        setState(() {
+                          startDate = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            time.hour,
+                            time.minute,
+                          );
+                        });
+                      }
+                    }
+                  },
+                ),
+                // End date picker
+                ListTile(
+                  title: const Text('Ngày kết thúc'),
+                  subtitle: Text(endDate != null 
+                    ? '${endDate!.day}/${endDate!.month}/${endDate!.year} ${endDate!.hour}:${endDate!.minute.toString().padLeft(2, '0')}'
+                    : 'Chọn ngày kết thúc'),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: startDate ?? DateTime.now(),
+                      firstDate: startDate ?? DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date != null) {
+                      final time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (time != null) {
+                        setState(() {
+                          endDate = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            time.hour,
+                            time.minute,
+                          );
+                        });
+                      }
+                    }
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Mô tả',
-                hintText: 'Nhập mô tả ngắn gọn',
-              ),
-              maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Hủy'),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: timeLimitController,
-              decoration: const InputDecoration(
-                labelText: 'Thời gian làm bài (phút)',
-                hintText: 'Nhập thời gian làm bài',
-              ),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleController.text.trim().isEmpty) {
+                  Get.snackbar(
+                    'Lỗi',
+                    'Vui lòng nhập tiêu đề bài tập',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                  return;
+                }
+
+                if (startDate != null && endDate != null && endDate!.isBefore(startDate!)) {
+                  Get.snackbar(
+                    'Lỗi',
+                    'Ngày kết thúc phải sau ngày bắt đầu',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                  return;
+                }
+                
+                Get.back();
+                
+                // Chuyển đến màn hình tạo bài tập
+                final result = await Get.to(() => CreateExerciseScreen(
+                  lessonId: widget.lessonId,
+                  classroomId: widget.classroomId,
+                  initialTitle: titleController.text.trim(),
+                  initialDescription: descriptionController.text.trim(),
+                  initialTimeLimit: timeLimitController.text.trim(),
+                  initialStartTime: startDate != null ? Timestamp.fromDate(startDate!) : null,
+                  initialEndTime: endDate != null ? Timestamp.fromDate(endDate!) : null,
+                ));
+
+                if (result == true) {
+                  _loadLesson();
+                }
+              },
+              child: const Text('Tiếp tục'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (titleController.text.trim().isEmpty) {
-                Get.snackbar(
-                  'Lỗi',
-                  'Vui lòng nhập tiêu đề bài tập',
-                  snackPosition: SnackPosition.BOTTOM,
-                );
-                return;
-              }
-              
-              Get.back();
-              
-              // Chuyển đến màn hình tạo bài tập
-              final result = await Get.to(() => CreateExerciseScreen(
-                lessonId: widget.lessonId,
-                classroomId: widget.classroomId,
-                initialTitle: titleController.text.trim(),
-                initialDescription: descriptionController.text.trim(),
-                initialTimeLimit: timeLimitController.text.trim(),
-              ));
-
-              if (result == true) {
-                _loadLesson();
-              }
-            },
-            child: const Text('Tiếp tục'),
-          ),
-        ],
       ),
     );
   }

@@ -3,6 +3,7 @@ import '../utils/input_validator.dart';
 import 'base_model.dart';
 import 'quiz.dart';
 import 'question_bank.dart';
+import 'package:flutter/material.dart';
 
 class DifficultyMatrix {
   final int easyCount;
@@ -48,6 +49,8 @@ class Exercise extends BaseModel {
   final String createdBy;
   final List<String> questionBankIds;
   final List<String> tags;
+  final Timestamp? startTime;  // Thời gian bắt đầu (optional)
+  final Timestamp? endTime;    // Thời gian kết thúc (optional)
 
   Exercise({
     String? id,
@@ -64,6 +67,8 @@ class Exercise extends BaseModel {
     required this.createdBy,
     this.questionBankIds = const [],
     this.tags = const [],
+    this.startTime,
+    this.endTime,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) : super(
@@ -71,6 +76,39 @@ class Exercise extends BaseModel {
           createdAt: createdAt,
           updatedAt: updatedAt,
         );
+
+  // Thêm getter để kiểm tra trạng thái thời gian
+  bool get isActive {
+    if (startTime == null || endTime == null) return true;
+    final now = DateTime.now();
+    return now.isAfter(startTime!.toDate()) && now.isBefore(endTime!.toDate());
+  }
+
+  bool get isExpired {
+    if (endTime == null) return false;
+    return DateTime.now().isAfter(endTime!.toDate());
+  }
+
+  bool get isNotStarted {
+    if (startTime == null) return false;
+    return DateTime.now().isBefore(startTime!.toDate());
+  }
+
+  // Tính số ngày còn lại
+  int? get daysRemaining {
+    if (endTime == null) return null;
+    final now = DateTime.now();
+    final end = endTime!.toDate();
+    return end.difference(now).inDays;
+  }
+
+  // Lấy màu hiển thị dựa trên thời gian còn lại
+  Color get timeStatusColor {
+    if (endTime == null) return Colors.green;
+    if (isExpired) return Colors.red;
+    if (daysRemaining! <= 1) return Colors.orange;
+    return Colors.green;
+  }
 
   factory Exercise.fromMap(Map<String, dynamic> map, String id) {
     // Debug logging
@@ -120,6 +158,8 @@ class Exercise extends BaseModel {
       createdBy: map['createdBy'] ?? '',
       questionBankIds: List<String>.from(map['questionBankIds'] ?? []),
       tags: List<String>.from(map['tags'] ?? []),
+      startTime: map['startTime'],
+      endTime: map['endTime'],
       createdAt: map['createdAt'],
       updatedAt: map['updatedAt'] ?? map['createdAt'],
     );
@@ -141,6 +181,8 @@ class Exercise extends BaseModel {
       'createdBy': createdBy,
       'questionBankIds': questionBankIds,
       'tags': tags,
+      'startTime': startTime,
+      'endTime': endTime,
       'createdAt': createdAt ?? Timestamp.now(),
       'updatedAt': updatedAt ?? Timestamp.now(),
     };
@@ -155,6 +197,8 @@ class Exercise extends BaseModel {
     int? timeLimit,
     int? attemptsAllowed,
     String? createdBy,
+    Timestamp? startTime,
+    Timestamp? endTime,
   }) {
     Map<String, String?> errors = {};
 
@@ -188,6 +232,18 @@ class Exercise extends BaseModel {
       errors['createdBy'] = 'ID người tạo không được để trống';
     }
 
+    if (startTime != null && endTime != null) {
+      if (startTime.toDate().isBefore(DateTime.now())) {
+        errors['startTime'] = 'Thời gian bắt đầu phải sau thời gian hiện tại';
+      }
+      if (endTime.toDate().isBefore(DateTime.now())) {
+        errors['endTime'] = 'Thời gian kết thúc phải sau thời gian hiện tại';
+      }
+      if (endTime.toDate().isBefore(startTime.toDate())) {
+        errors['endTime'] = 'Thời gian kết thúc phải sau thời gian bắt đầu';
+      }
+    }
+
     return errors;
   }
 
@@ -201,6 +257,8 @@ class Exercise extends BaseModel {
       timeLimit: timeLimit,
       attemptsAllowed: attemptsAllowed,
       createdBy: createdBy,
+      startTime: startTime,
+      endTime: endTime,
     );
   }
 
@@ -219,6 +277,8 @@ class Exercise extends BaseModel {
     required String createdBy,
     List<String> questionBankIds = const [],
     List<String> tags = const [],
+    Timestamp? startTime,
+    Timestamp? endTime,
   }) async {
     final errors = validate(
       title: title,
@@ -228,6 +288,8 @@ class Exercise extends BaseModel {
       timeLimit: timeLimit,
       attemptsAllowed: attemptsAllowed,
       createdBy: createdBy,
+      startTime: startTime,
+      endTime: endTime,
     );
 
     if (errors.isNotEmpty) {
@@ -252,6 +314,8 @@ class Exercise extends BaseModel {
         'createdBy': createdBy,
         'questionBankIds': questionBankIds,
         'tags': tags,
+        'startTime': startTime,
+        'endTime': endTime,
         'createdAt': Timestamp.now(),
         'updatedAt': Timestamp.now(),
       });
@@ -403,6 +467,8 @@ class Exercise extends BaseModel {
         createdBy: createdBy,
         questionBankIds: questionBankIds,
         tags: tags,
+        startTime: Timestamp.now(),
+        endTime: Timestamp.now(),
       );
     } catch (e) {
       print('Error creating exercise from question bank: $e');
@@ -426,6 +492,8 @@ class Exercise extends BaseModel {
     String? createdBy,
     List<String>? questionBankIds,
     List<String>? tags,
+    Timestamp? startTime,
+    Timestamp? endTime,
     Timestamp? createdAt,
     Timestamp? updatedAt,
   }) {
@@ -444,6 +512,8 @@ class Exercise extends BaseModel {
       createdBy: createdBy ?? this.createdBy,
       questionBankIds: questionBankIds ?? this.questionBankIds,
       tags: tags ?? this.tags,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

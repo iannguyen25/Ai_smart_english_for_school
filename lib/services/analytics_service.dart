@@ -747,115 +747,125 @@ class AnalyticsService {
       final startDate = now.subtract(Duration(days: days));
       final startTimestamp = Timestamp.fromDate(startDate);
       
-      // Tổng số bài học
-      final totalLessonsSnapshot = await _firestore
-          .collection('lessons')
-          .count()
-          .get();
+      // Lấy danh sách tất cả các lớp học
+      final classroomsSnapshot = await _firestore.collection('classrooms').get();
+      final classrooms = classroomsSnapshot.docs;
       
-      final totalLessons = totalLessonsSnapshot.count;
+      // Khởi tạo list để lưu thông tin chi tiết cho mỗi loại tài nguyên
+      List<Map<String, dynamic>> lessonDetails = [];
+      List<Map<String, dynamic>> flashcardDetails = [];
+      List<Map<String, dynamic>> exerciseDetails = [];
+      List<Map<String, dynamic>> quizDetails = [];
       
-      // Bài học mới trong khoảng thời gian
-      final newLessonsSnapshot = await _firestore
-          .collection('lessons')
-          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
-          .count()
-          .get();
+      // Tổng số và số mới cho mỗi loại tài nguyên
+      int totalLessons = 0;
+      int newLessons = 0;
+      int totalFlashcards = 0;
+      int newFlashcards = 0;
+      int totalExercises = 0;
+      int newExercises = 0;
+      int totalQuizzes = 0;
+      int newQuizzes = 0;
       
-      final newLessons = newLessonsSnapshot.count;
-      
-      // Tổng số flashcard
-      final totalFlashcardsSnapshot = await _firestore
-          .collection('flashcards')
-          .count()
-          .get();
-      
-      final totalFlashcards = totalFlashcardsSnapshot.count;
-      
-      // Flashcard mới trong khoảng thời gian
-      final newFlashcardsSnapshot = await _firestore
-          .collection('flashcards')
-          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
-          .count()
-          .get();
-      
-      final newFlashcards = newFlashcardsSnapshot.count;
-      
-      // Tổng số bài tập
-      final totalExercisesSnapshot = await _firestore
-          .collection('exercises')
-          .count()
-          .get();
-      
-      final totalExercises = totalExercisesSnapshot.count;
-      
-      // Bài tập mới trong khoảng thời gian
-      final newExercisesSnapshot = await _firestore
-          .collection('exercises')
-          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
-          .count()
-          .get();
-      
-      final newExercises = newExercisesSnapshot.count;
-      
-      // Tổng số bài kiểm tra
-      final totalQuizzesSnapshot = await _firestore
-          .collection('quizzes')
-          .count()
-          .get();
-      
-      final totalQuizzes = totalQuizzesSnapshot.count;
-      
-      // Bài kiểm tra mới trong khoảng thời gian
-      final newQuizzesSnapshot = await _firestore
-          .collection('quizzes')
-          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
-          .count()
-          .get();
-      
-      final newQuizzes = newQuizzesSnapshot.count;
-      
-      // Tìm bài học có vấn đề (nhiều báo lỗi)
-      final problemLessons = await _firestore
-          .collection('feedbacks')
-          .where('type', isEqualTo: 'report')
-          .get();
-      
-      // Đếm số báo cáo lỗi cho mỗi bài học
-      Map<String, int> lessonReportCounts = {};
-      Map<String, String> lessonTitles = {};
-      
-      for (var feedback in problemLessons.docs) {
-        final data = feedback.data();
-        final lessonId = data['lessonId'];
+      // Xử lý thông tin cho từng lớp học
+      for (var classroom in classrooms) {
+        final classroomId = classroom.id;
+        final classroomName = classroom.data()['name'] ?? 'Lớp không xác định';
         
-        if (lessonId != null) {
-          lessonReportCounts[lessonId] = (lessonReportCounts[lessonId] ?? 0) + 1;
-          
-          // Lấy tiêu đề bài học nếu chưa có
-          if (!lessonTitles.containsKey(lessonId)) {
-            final lessonDoc = await _firestore.collection('lessons').doc(lessonId).get();
-            if (lessonDoc.exists) {
-              lessonTitles[lessonId] = lessonDoc.data()?['title'] ?? 'Bài học';
-            } else {
-              lessonTitles[lessonId] = 'Bài học không xác định';
-            }
-          }
-        }
+        // Thống kê bài học
+        final lessonsSnapshot = await _firestore
+            .collection('lessons')
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
+            
+        // Lọc bài học mới trong code thay vì dùng query
+        final classroomNewLessons = lessonsSnapshot.docs.where((doc) {
+          final createdAt = doc.data()['createdAt'] as Timestamp?;
+          return createdAt != null && createdAt.toDate().isAfter(startDate);
+        }).length;
+            
+        lessonDetails.add({
+          'classroomId': classroomId,
+          'classroomName': classroomName,
+          'total': lessonsSnapshot.docs.length,
+          'new': classroomNewLessons,
+        });
+        
+        totalLessons += lessonsSnapshot.docs.length;
+        newLessons += classroomNewLessons;
+        
+        // Thống kê flashcards
+        final flashcardsSnapshot = await _firestore
+            .collection('flashcards')
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
+            
+        // Lọc flashcards mới trong code
+        final classroomNewFlashcards = flashcardsSnapshot.docs.where((doc) {
+          final createdAt = doc.data()['createdAt'] as Timestamp?;
+          return createdAt != null && createdAt.toDate().isAfter(startDate);
+        }).length;
+            
+        flashcardDetails.add({
+          'classroomId': classroomId,
+          'classroomName': classroomName,
+          'total': flashcardsSnapshot.docs.length,
+          'new': classroomNewFlashcards,
+        });
+        
+        totalFlashcards += flashcardsSnapshot.docs.length;
+        newFlashcards += classroomNewFlashcards;
+        
+        // Thống kê bài tập
+        final exercisesSnapshot = await _firestore
+            .collection('exercises')
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
+            
+        // Lọc bài tập mới trong code
+        final classroomNewExercises = exercisesSnapshot.docs.where((doc) {
+          final createdAt = doc.data()['createdAt'] as Timestamp?;
+          return createdAt != null && createdAt.toDate().isAfter(startDate);
+        }).length;
+            
+        exerciseDetails.add({
+          'classroomId': classroomId,
+          'classroomName': classroomName,
+          'total': exercisesSnapshot.docs.length,
+          'new': classroomNewExercises,
+        });
+        
+        totalExercises += exercisesSnapshot.docs.length;
+        newExercises += classroomNewExercises;
+        
+        // Thống kê bài kiểm tra
+        final quizzesSnapshot = await _firestore
+            .collection('quizzes')
+            .where('classroomId', isEqualTo: classroomId)
+            .get();
+            
+        // Lọc bài kiểm tra mới trong code
+        final classroomNewQuizzes = quizzesSnapshot.docs.where((doc) {
+          final createdAt = doc.data()['createdAt'] as Timestamp?;
+          return createdAt != null && createdAt.toDate().isAfter(startDate);
+        }).length;
+            
+        quizDetails.add({
+          'classroomId': classroomId,
+          'classroomName': classroomName,
+          'total': quizzesSnapshot.docs.length,
+          'new': classroomNewQuizzes,
+        });
+        
+        totalQuizzes += quizzesSnapshot.docs.length;
+        newQuizzes += classroomNewQuizzes;
       }
       
-      // Chuyển đổi thành danh sách và sắp xếp theo số báo cáo giảm dần
-      List<Map<String, dynamic>> problematicLessons = lessonReportCounts.entries
-          .where((entry) => entry.value >= 2) // Chỉ lấy bài học có từ 2 báo cáo trở lên
-          .map((entry) => {
-            'lessonId': entry.key,
-            'lessonTitle': lessonTitles[entry.key] ?? 'Bài học',
-            'reportCount': entry.value,
-          })
-          .toList();
-      
-      problematicLessons.sort((a, b) => 
-          (b['reportCount'] as int).compareTo(a['reportCount'] as int));
+      // Sắp xếp chi tiết theo số lượng tài nguyên giảm dần
+      lessonDetails.sort((a, b) => (b['total'] as int).compareTo(a['total'] as int));
+      flashcardDetails.sort((a, b) => (b['total'] as int).compareTo(a['total'] as int));
+      exerciseDetails.sort((a, b) => (b['total'] as int).compareTo(a['total'] as int));
+      quizDetails.sort((a, b) => (b['total'] as int).compareTo(a['total'] as int));
       
       return {
         'totalLessons': totalLessons,
@@ -866,10 +876,14 @@ class AnalyticsService {
         'newExercises': newExercises,
         'totalQuizzes': totalQuizzes,
         'newQuizzes': newQuizzes,
-        'problematicLessons': problematicLessons.take(10).toList(), // Top 10 bài học có vấn đề
+        'lessonDetails': lessonDetails,
+        'flashcardDetails': flashcardDetails,
+        'exerciseDetails': exerciseDetails,
+        'quizDetails': quizDetails,
         'periodDays': days,
       };
     } catch (e) {
+      print('ERROR in getLearningResourcesReport: $e');
       throw e.toString();
     }
   }

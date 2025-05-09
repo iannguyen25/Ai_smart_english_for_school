@@ -297,6 +297,8 @@ class ExerciseService {
     int? attemptsAllowed,
     bool? visibility,
     List<String>? tags,
+    Timestamp? startTime,
+    Timestamp? endTime,
   }) async {
     try {
       print('Starting updateExercise for id: $id');
@@ -318,6 +320,8 @@ class ExerciseService {
       if (attemptsAllowed != null) updates['attemptsAllowed'] = attemptsAllowed;
       if (visibility != null) updates['visibility'] = visibility;
       if (tags != null) updates['tags'] = tags;
+      if (startTime != null) updates['startTime'] = startTime;
+      if (endTime != null) updates['endTime'] = endTime;
       
       print('Applying basic updates to exercise document');
       await _exercisesCollection.doc(id).update(updates);

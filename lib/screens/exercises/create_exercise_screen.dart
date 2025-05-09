@@ -10,6 +10,8 @@ class CreateExerciseScreen extends StatefulWidget {
   final String? lessonId;
   final String? classroomId;
   final bool isSample;
+  final Timestamp? initialStartTime;
+  final Timestamp? initialEndTime;
 
   const CreateExerciseScreen({
     Key? key,
@@ -19,6 +21,8 @@ class CreateExerciseScreen extends StatefulWidget {
     this.lessonId,
     this.classroomId,
     this.isSample = false,
+    this.initialStartTime,
+    this.initialEndTime,
   }) : super(key: key);
   @override
   _CreateExerciseScreenState createState() => _CreateExerciseScreenState();
@@ -31,6 +35,8 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
   final _timeLimitController = TextEditingController(text: '15'); // Default 15 minutes
   
   bool _isLoading = false;
+  Timestamp? _startTime;
+  Timestamp? _endTime;
   
   // Questions list
   List<Map<String, dynamic>> _questions = [
@@ -47,6 +53,8 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
     super.initState();
     _titleController.text = widget.initialTitle ?? '';
     _descriptionController.text = widget.initialDescription ?? '';
+    _startTime = widget.initialStartTime;
+    _endTime = widget.initialEndTime;
   }
 
   @override
@@ -165,6 +173,8 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
         'questionCount': _questions.length,
         'timeLimit': timeLimit,
         'isSample': widget.isSample,
+        'startTime': _startTime,
+        'endTime': _endTime,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -298,6 +308,73 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
                                   return 'Thời gian phải là số dương';
                                 }
                                 return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            // Start time picker
+                            ListTile(
+                              title: const Text('Ngày bắt đầu'),
+                              subtitle: Text(_startTime != null 
+                                ? '${_startTime!.toDate().day}/${_startTime!.toDate().month}/${_startTime!.toDate().year} ${_startTime!.toDate().hour}:${_startTime!.toDate().minute.toString().padLeft(2, '0')}'
+                                : 'Chọn ngày bắt đầu'),
+                              trailing: const Icon(Icons.calendar_today),
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: _startTime?.toDate() ?? DateTime.now(),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (date != null) {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.now(),
+                                  );
+                                  if (time != null) {
+                                    setState(() {
+                                      _startTime = Timestamp.fromDate(DateTime(
+                                        date.year,
+                                        date.month,
+                                        date.day,
+                                        time.hour,
+                                        time.minute,
+                                      ));
+                                    });
+                                  }
+                                }
+                              },
+                            ),
+                            // End time picker
+                            ListTile(
+                              title: const Text('Ngày kết thúc'),
+                              subtitle: Text(_endTime != null 
+                                ? '${_endTime!.toDate().day}/${_endTime!.toDate().month}/${_endTime!.toDate().year} ${_endTime!.toDate().hour}:${_endTime!.toDate().minute.toString().padLeft(2, '0')}'
+                                : 'Chọn ngày kết thúc'),
+                              trailing: const Icon(Icons.calendar_today),
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: _endTime?.toDate() ?? _startTime?.toDate() ?? DateTime.now(),
+                                  firstDate: _startTime?.toDate() ?? DateTime.now(),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (date != null) {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.now(),
+                                  );
+                                  if (time != null) {
+                                    setState(() {
+                                      _endTime = Timestamp.fromDate(DateTime(
+                                        date.year,
+                                        date.month,
+                                        date.day,
+                                        time.hour,
+                                        time.minute,
+                                      ));
+                                    });
+                                  }
+                                }
                               },
                             ),
                           ],

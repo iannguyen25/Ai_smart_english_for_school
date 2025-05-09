@@ -5,6 +5,7 @@ import 'storage_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/course.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
 
 class ClassroomService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -53,13 +54,39 @@ class ClassroomService {
   // Thêm thành viên vào lớp
   Future<void> addMember(String classroomId, String userId) async {
     try {
-      await _classroomsRef.doc(classroomId).update({
-        'memberIds': FieldValue.arrayUnion([userId]),
-        'updatedAt': Timestamp.now(),
-      });
+      // Get user data to check role
+      final userService = UserService();
+      final user = await userService.getUserById(userId);
+      
+      if (user == null) {
+        throw 'Không tìm thấy người dùng';
+      }
+
+      // Get current classroom data
+      final classroomDoc = await _firestore.collection('classrooms').doc(classroomId).get();
+      if (!classroomDoc.exists) {
+        throw 'Không tìm thấy lớp học';
+      }
+
+      final classroom = Classroom.fromMap(classroomDoc.data()!, classroomDoc.id);
+      
+      // If user is a teacher, update teacherId
+      if (user.roleId == 'teacher') {
+        await _firestore.collection('classrooms').doc(classroomId).update({
+          'teacherId': userId,
+          'memberIds': FieldValue.arrayUnion([userId]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Normal member addition
+        await _firestore.collection('classrooms').doc(classroomId).update({
+          'memberIds': FieldValue.arrayUnion([userId]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
     } catch (e) {
       print('Error adding member: $e');
-      throw 'Không thể thêm thành viên';
+      rethrow;
     }
   }
 
@@ -690,6 +717,49 @@ class ClassroomService {
     } catch (e) {
       print('Error adding lesson to classroom: $e');
       throw Exception('Không thể thêm bài học vào lớp học: $e');
+    }
+  }
+
+  // Chuyển thành viên thành giáo viên
+  Future<void> makeTeacher(String classroomId, String userId) async {
+    try {
+      print('Bắt đầu chuyển thành viên thành giáo viên...');
+      print('Classroom ID: $classroomId');
+      print('User ID: $userId');
+
+      // Kiểm tra user có tồn tại không
+      final userService = UserService();
+      final user = await userService.getUserById(userId);
+      
+      if (user == null) {
+        print('Không tìm thấy người dùng');
+        throw 'Không tìm thấy người dùng';
+      }
+
+      // Kiểm tra user có phải là thành viên của lớp không
+      final classroomDoc = await _firestore.collection('classrooms').doc(classroomId).get();
+      if (!classroomDoc.exists) {
+        print('Không tìm thấy lớp học');
+        throw 'Không tìm thấy lớp học';
+      }
+
+      final classroom = Classroom.fromMap(classroomDoc.data()!, classroomDoc.id);
+      if (!classroom.memberIds.contains(userId)) {
+        print('Người dùng không phải là thành viên của lớp');
+        throw 'Người dùng không phải là thành viên của lớp';
+      }
+
+      print('Cập nhật teacherId thành: $userId');
+      // Cập nhật teacherId
+      await _firestore.collection('classrooms').doc(classroomId).update({
+        'teacherId': userId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('Đã chuyển thành viên thành giáo viên thành công');
+    } catch (e) {
+      print('Lỗi khi chuyển thành viên thành giáo viên: $e');
+      throw 'Lỗi khi chuyển thành viên thành giáo viên: $e';
     }
   }
 }

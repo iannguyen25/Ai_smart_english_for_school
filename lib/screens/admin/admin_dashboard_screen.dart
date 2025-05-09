@@ -9,6 +9,8 @@ import 'package:get/get.dart';
 import 'user_management_screen.dart';
 import 'create_edit_course_screen.dart';
 import 'course_management_screen.dart';
+import 'lesson_preview_screen.dart';
+import 'flashcard_preview_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
@@ -627,26 +629,49 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           child: Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      content['title'] ?? '',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Colors.white,
+                child: GestureDetector(
+                  onTap: () {
+                    if (content['type'] == 'lesson') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LessonPreviewScreen(
+                            lessonId: content['id'],
+                          ),
+                        ),
+                      );
+                    } else if (content['type'] == 'flashcard') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FlashcardPreviewScreen(
+                            flashcardId: content['id'],
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        content['title'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${content['type'] == 'lesson' ? 'Bài học' : 'Flashcard'} • ${content['authorName'] ?? 'Không xác định'}',
-                      style: TextStyle(
-                        color: Colors.grey[300],
-                        fontSize: 14,
+                      const SizedBox(height: 4),
+                      Text(
+                        '${content['type'] == 'lesson' ? 'Bài học' : 'Flashcard'} • ${content['authorName'] ?? 'Không xác định'}',
+                        style: TextStyle(
+                          color: Colors.grey[300],
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               Row(

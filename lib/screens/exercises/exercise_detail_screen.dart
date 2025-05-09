@@ -431,7 +431,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
             ],
           ),
           actions: [
-            if (!_isTeacherOrAdmin && _exercise != null && _attempt?.status == AttemptStatus.inProgress)
+            if (_exercise != null && _attempt?.status == AttemptStatus.inProgress)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 alignment: Alignment.center,
@@ -483,16 +483,98 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
             ],
           ],
         ),
-        body: Column(
-          children: [
-            _buildStatusInfo(),
-            Expanded(
-              // child: SingleChildScrollView(
-                child: _buildBody(),
-              // ),
-            ),
-          ],
-        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadExercise,
+                          child: const Text('Thử lại'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _exercise == null
+                    ? const Center(child: Text('Không tìm thấy thông tin bài tập'))
+                    : Column(
+                        children: [
+                          if (_exercise?.endTime != null)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: _exercise!.timeStatusColor.withOpacity(0.1),
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: _exercise!.timeStatusColor.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _exercise!.isExpired
+                                        ? Icons.timer_off
+                                        : _exercise!.isNotStarted
+                                            ? Icons.timer
+                                            : Icons.timer_outlined,
+                                    color: _exercise!.timeStatusColor,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _exercise!.isExpired
+                                              ? 'Đã hết hạn'
+                                              : _exercise!.isNotStarted
+                                                  ? 'Chưa bắt đầu'
+                                                  : _formatRemainingTime(_exercise!.endTime!.toDate()),
+                                          style: TextStyle(
+                                            color: _exercise!.timeStatusColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        if (!_exercise!.isExpired && !_exercise!.isNotStarted)
+                                          Text(
+                                            'Hết hạn vào: ${_formatDateTime(_exercise!.endTime!.toDate())}',
+                                            style: TextStyle(
+                                              color: _exercise!.timeStatusColor.withOpacity(0.8),
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Expanded(
+                            child: _isTeacherOrAdmin
+                                ? _buildTeacherView()
+                                : TabBarView(
+                                    controller: _tabController,
+                                    children: [
+                                      _buildExamTab(),
+                                    ],
+                                  ),
+                          ),
+                        ],
+                      ),
         bottomNavigationBar: !_isTeacherOrAdmin && _hasStarted ? _buildBottomBar() : null,
         floatingActionButton: _isTeacherOrAdmin ? FloatingActionButton(
           onPressed: () {
@@ -502,50 +584,6 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
           tooltip: 'Thêm câu hỏi',
         ) : null,
       ),
-    );
-  }
-  
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.red),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadExercise,
-              child: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    if (_exercise == null) {
-      return const Center(child: Text('Không tìm thấy thông tin bài tập'));
-    }
-
-    if (_isTeacherOrAdmin) {
-      return _buildTeacherView();
-    }
-
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        // Tab kiểm tra
-        _buildExamTab()
-      ],
     );
   }
   
@@ -1364,6 +1402,22 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
   
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatRemainingTime(DateTime endTime) {
+    final now = DateTime.now();
+    final difference = endTime.difference(now);
+    final days = difference.inDays;
+    final hours = difference.inHours % 24;
+    final minutes = difference.inMinutes % 60;
+
+    if (days > 0) {
+      return 'Còn $days ngày';
+    } else if (hours > 0) {
+      return 'Còn $hours giờ ${minutes > 0 ? '$minutes phút' : ''}';
+    } else {
+      return 'Còn $minutes phút';
+    }
   }
 
   Future<bool> _onWillPop() async {

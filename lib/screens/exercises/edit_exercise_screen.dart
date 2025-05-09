@@ -32,6 +32,8 @@ class _EditExerciseScreenState extends State<EditExerciseScreen> {
   bool _isShuffleEnabled = true;
   bool _isVisible = true;
   List<Question> _questions = [];
+  Timestamp? _startTime;
+  Timestamp? _endTime;
   
   @override
   void initState() {
@@ -50,6 +52,8 @@ class _EditExerciseScreenState extends State<EditExerciseScreen> {
       _isShuffleEnabled = widget.exercise.shuffle;
       _isVisible = widget.exercise.visibility;
       _questions = List.from(widget.exercise.questions);
+      _startTime = widget.exercise.startTime;
+      _endTime = widget.exercise.endTime;
       print('DEBUG: Data initialized successfully');
       print('DEBUG: Questions loaded: ${_questions.length}');
       if (_questions.isNotEmpty) {
@@ -211,48 +215,19 @@ class _EditExerciseScreenState extends State<EditExerciseScreen> {
         }
         
         if (!hasCorrectChoice) {
-          print('DEBUG: Question $i has no correct choices');
+          print('DEBUG: Question $i has no correct choice');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Mỗi câu hỏi phải có ít nhất một lựa chọn đúng')),
           );
           return;
         }
       }
-
+      
       setState(() => _isLoading = true);
-      print('DEBUG: All validation passed, proceeding to save');
-
-      final currentUser = auth.FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        print('DEBUG: No current user found');
-        throw Exception('Bạn chưa đăng nhập');
-      }
       
-      final int timeLimit = int.tryParse(_durationController.text) ?? 15;
-      final int attemptsAllowed = int.tryParse(_attemptsController.text) ?? 1;
-
-      print('DEBUG: Updating exercise with ID: ${widget.exercise.id}');
-      print('DEBUG: Title: ${_titleController.text.trim()}');
-      print('DEBUG: Description: ${_descriptionController.text.trim()}');
-      print('DEBUG: Time limit: $timeLimit minutes');
-      print('DEBUG: Attempts allowed: $attemptsAllowed');
-      print('DEBUG: Questions count: ${_questions.length}');
+      final timeLimit = int.parse(_durationController.text);
+      final attemptsAllowed = int.parse(_attemptsController.text);
       
-      if (_questions.isNotEmpty) {
-        for (int i = 0; i < _questions.length; i++) {
-          print('DEBUG: Question $i - content: ${_questions[i].content}');
-          print('DEBUG: Question $i - choices: ${_questions[i].choices?.length ?? 0}');
-          if (_questions[i].choices != null) {
-            for (int j = 0; j < _questions[i].choices!.length; j++) {
-              print('DEBUG: Question $i - Choice $j: ${_questions[i].choices![j].content}');
-              print('DEBUG: Question $i - Choice $j isCorrect: ${_questions[i].choices![j].isCorrect}');
-            }
-          }
-        }
-      }
-
-      // Cập nhật bài tập
-      print('DEBUG: Calling ExerciseService.updateExercise');
       await _exerciseService.updateExercise(
         widget.exercise.id!,
         title: _titleController.text.trim(),
@@ -262,6 +237,8 @@ class _EditExerciseScreenState extends State<EditExerciseScreen> {
         attemptsAllowed: attemptsAllowed,
         shuffle: _isShuffleEnabled,
         visibility: _isVisible,
+        startTime: _startTime,
+        endTime: _endTime,
       );
 
       print('DEBUG: Exercise updated successfully');
@@ -430,6 +407,105 @@ class _EditExerciseScreenState extends State<EditExerciseScreen> {
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Start date picker
+                          ListTile(
+                            title: const Text('Ngày bắt đầu'),
+                            subtitle: Text(_startTime != null 
+                              ? '${_startTime!.toDate().day}/${_startTime!.toDate().month}/${_startTime!.toDate().year} ${_startTime!.toDate().hour}:${_startTime!.toDate().minute.toString().padLeft(2, '0')}'
+                              : 'Chọn ngày bắt đầu'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.calendar_today),
+                                  onPressed: () async {
+                                    final date = await showDatePicker(
+                                      context: context,
+                                      initialDate: _startTime?.toDate() ?? DateTime.now(),
+                                      firstDate: DateTime.now(),
+                                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    );
+                                    if (date != null) {
+                                      final time = await showTimePicker(
+                                        context: context,
+                                        initialTime: TimeOfDay.fromDateTime(_startTime?.toDate() ?? DateTime.now()),
+                                      );
+                                      if (time != null) {
+                                        setState(() {
+                                          _startTime = Timestamp.fromDate(DateTime(
+                                            date.year,
+                                            date.month,
+                                            date.day,
+                                            time.hour,
+                                            time.minute,
+                                          ));
+                                        });
+                                      }
+                                    }
+                                  },
+                                ),
+                                if (_startTime != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      setState(() {
+                                        _startTime = null;
+                                      });
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                          // End date picker
+                          ListTile(
+                            title: const Text('Ngày kết thúc'),
+                            subtitle: Text(_endTime != null 
+                              ? '${_endTime!.toDate().day}/${_endTime!.toDate().month}/${_endTime!.toDate().year} ${_endTime!.toDate().hour}:${_endTime!.toDate().minute.toString().padLeft(2, '0')}'
+                              : 'Chọn ngày kết thúc'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.calendar_today),
+                                  onPressed: () async {
+                                    final date = await showDatePicker(
+                                      context: context,
+                                      initialDate: _endTime?.toDate() ?? (_startTime?.toDate() ?? DateTime.now()),
+                                      firstDate: _startTime?.toDate() ?? DateTime.now(),
+                                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    );
+                                    if (date != null) {
+                                      final time = await showTimePicker(
+                                        context: context,
+                                        initialTime: TimeOfDay.fromDateTime(_endTime?.toDate() ?? DateTime.now()),
+                                      );
+                                      if (time != null) {
+                                        setState(() {
+                                          _endTime = Timestamp.fromDate(DateTime(
+                                            date.year,
+                                            date.month,
+                                            date.day,
+                                            time.hour,
+                                            time.minute,
+                                          ));
+                                        });
+                                      }
+                                    }
+                                  },
+                                ),
+                                if (_endTime != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      setState(() {
+                                        _endTime = null;
+                                      });
+                                    },
+                                  ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

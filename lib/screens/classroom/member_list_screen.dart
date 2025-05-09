@@ -173,6 +173,51 @@ class _MemberListScreenState extends State<MemberListScreen> {
     }
   }
 
+  Future<void> _makeTeacher(User user) async {
+    // Show confirmation dialog
+    final confirm = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Xác nhận'),
+        content: Text('Bạn có chắc chắn muốn chuyển ${user.firstName} ${user.lastName} thành giáo viên của lớp học không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            style: TextButton.styleFrom(foregroundColor: Colors.blue),
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    
+    try {
+      await _classroomService.makeTeacher(_classroom.id!, user.id!);
+      await _loadMembers(); // Refresh the data
+
+      Get.snackbar(
+        'Thành công',
+        'Đã chuyển ${user.firstName} ${user.lastName} thành giáo viên',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      Get.snackbar(
+        'Lỗi',
+        'Không thể chuyển thành giáo viên: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -307,6 +352,11 @@ class _MemberListScreenState extends State<MemberListScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
+                          icon: const Icon(Icons.person_add_alt_1_outlined),
+                          color: Colors.blue,
+                          onPressed: () => _makeTeacher(member),
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.check_circle_outline),
                           color: Colors.green,
                           onPressed: () => _approveMember(member),
@@ -341,10 +391,12 @@ class _MemberListScreenState extends State<MemberListScreen> {
         final member = _members[index];
               final isTeacher = member.id == _classroom.teacherId;
 
-        return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
+        return InkWell(
+          onTap: () => _makeTeacher(member),
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: CircleAvatar(
               backgroundImage:
                   member.avatar != null ? NetworkImage(member.avatar!) : null,
               child: member.avatar == null
@@ -360,6 +412,7 @@ class _MemberListScreenState extends State<MemberListScreen> {
                     onPressed: () => _removeMember(member),
                   )
                 : null,
+          ),
           ),
         );
       },
