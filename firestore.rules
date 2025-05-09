@@ -497,5 +497,13 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && 
         resource.data.userId == request.auth.uid;
     }
+
+    match /sample_content/{contentId} {
+      // Allow read if authenticated
+      allow read: if isAuthenticated();
+      
+      // Only allow admins to write to sample content
+      allow write: if isAuthenticated() && isAdmin();
+    }
   }
 }

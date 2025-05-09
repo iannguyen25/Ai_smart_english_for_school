@@ -125,16 +125,19 @@ class BadgeService {
     String? metadata,
   }) async {
     try {
+      print('DEBUG: Starting badge award process for user: $userId, badge: $badgeId');
+      
       // Kiểm tra xem huy hiệu có tồn tại không
       final badgeDoc = await _badgesCollection.doc(badgeId).get();
       if (!badgeDoc.exists) {
-        print('Badge does not exist');
+        print('DEBUG: Badge does not exist with ID: $badgeId');
         return null;
       }
       
       // Lấy thông tin huy hiệu
       final badgeData = badgeDoc.data() as Map<String, dynamic>;
       final isOneTime = badgeData['isOneTime'] ?? true;
+      print('DEBUG: Badge data: ${badgeData['name']}, isOneTime: $isOneTime');
       
       // Kiểm tra xem người dùng đã có huy hiệu này chưa
       if (isOneTime) {
@@ -145,7 +148,7 @@ class BadgeService {
             .get();
         
         if (existingBadge.docs.isNotEmpty) {
-          print('User already has this badge');
+          print('DEBUG: User already has this badge: ${badgeData['name']}');
           return UserBadge.fromMap(
             existingBadge.docs.first.data() as Map<String, dynamic>,
             existingBadge.docs.first.id,
@@ -153,6 +156,7 @@ class BadgeService {
         }
       }
       
+      print('DEBUG: Creating new badge for user');
       // Tạo huy hiệu mới cho người dùng
       final userBadgeDoc = await _userBadgesCollection.add({
         'userId': userId,
@@ -164,6 +168,7 @@ class BadgeService {
         'updatedAt': Timestamp.now(),
       });
       
+      print('DEBUG: Updating user document with new badge');
       // Cập nhật danh sách huy hiệu trong người dùng
       await _firestore.collection('users').doc(userId).update({
         'badges': FieldValue.arrayUnion([badgeId]),
@@ -172,12 +177,13 @@ class BadgeService {
       
       // Trả về huy hiệu đã tạo
       final userBadgeData = await userBadgeDoc.get();
+      print('DEBUG: Successfully awarded badge: ${badgeData['name']} to user: $userId');
       return UserBadge.fromMap(
         userBadgeData.data() as Map<String, dynamic>,
         userBadgeData.id,
       );
     } catch (e) {
-      print('Error awarding badge: $e');
+      print('DEBUG: Error awarding badge: $e');
       return null;
     }
   }
@@ -391,5 +397,82 @@ class BadgeService {
     } catch (e) {
       print('Error creating default badges: $e');
     }
+  }
+
+  // Tạo huy hiệu cho việc hoàn thành flashcard đầu tiên
+  Future<Badge?> createFirstFlashcardBadge() async {
+    print('DEBUG: Creating first flashcard badge');
+    try {
+      final badge = await createBadge(
+        name: 'Flashcard Đầu Tiên',
+        description: 'Hoàn thành flashcard đầu tiên của bạn',
+        iconUrl: 'assets/images/badges/first_flashcard.png',
+        type: BadgeType.activity,
+        requirements: {
+          'type': 'flashcard_completion',
+          'count': 1,
+        },
+        isHidden: false,
+        isOneTime: true,
+      );
+      print('DEBUG: First flashcard badge created: ${badge?.name}');
+      return badge;
+    } catch (e) {
+      print('DEBUG: Error creating first flashcard badge: $e');
+      return null;
+    }
+  }
+
+  // Kiểm tra và trao huy hiệu cho việc hoàn thành flashcard
+  Future<void> checkAndAwardFlashcardBadge(String userId) async {
+    print('DEBUG: Checking flashcard badge eligibility for user: $userId');
+    try {
+      // Kiểm tra xem người dùng đã có huy hiệu flashcard đầu tiên chưa
+      final userBadges = await getUserBadges(userId: userId);
+      print('DEBUG: Current user badges count: ${userBadges.length}');
+
+      // Tìm huy hiệu flashcard đầu tiên
+      final firstFlashcardBadge = await _badgesCollection
+          .where('name', isEqualTo: 'Flashcard Đầu Tiên')
+          .limit(1)
+          .get();
+
+      if (firstFlashcardBadge.docs.isEmpty) {
+        print('DEBUG: First flashcard badge not found, creating new one');
+        final newBadge = await createFirstFlashcardBadge();
+        if (newBadge != null) {
+          print('DEBUG: Awarding new first flashcard badge to user');
+          await awardBadgeToUser(
+            userId: userId,
+            badgeId: newBadge.id!,
+            metadata: 'First flashcard completion',
+          );
+        }
+      } else {
+        final badgeId = firstFlashcardBadge.docs.first.id;
+        print('DEBUG: Found existing first flashcard badge: $badgeId');
+        
+        // Kiểm tra xem người dùng đã có huy hiệu này chưa
+        final hasBadge = userBadges.any((badge) => badge.badgeId == badgeId);
+        if (!hasBadge) {
+          print('DEBUG: Awarding first flashcard badge to user');
+          await awardBadgeToUser(
+            userId: userId,
+            badgeId: badgeId,
+            metadata: 'First flashcard completion',
+          );
+        } else {
+          print('DEBUG: User already has first flashcard badge');
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error checking flashcard badge: $e');
+    }
+  }
+
+  // Show badge notification
+  Future<void> showBadgeNotification(String badgeName) async {
+    print('DEBUG: New badge awarded: $badgeName');
+    // TODO: Implement notification logic
   }
 } 

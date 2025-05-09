@@ -1512,7 +1512,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                   color: Colors.indigo.shade700,
                 ),
               ),
-              if (_isTeacher || _isAdmin)
+              if (_isTeacher && _isCourseClosed || _isAdmin && _isCourseClosed)
                 ElevatedButton.icon(
                   onPressed: _showAddVideoDialog,
                   icon: const Icon(Icons.add),
@@ -1938,14 +1938,15 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                     ),
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _showAddFlashcardDialog,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Thêm thẻ ghi nhớ'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  if (_isCourseClosed)
+                    ElevatedButton.icon(
+                      onPressed: _showAddFlashcardDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Thêm thẻ ghi nhớ'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
                     ),
-                  ),
                 ] else ...[
                   Icon(Icons.style, size: 64, color: Colors.grey.shade400),
                   const SizedBox(height: 16),
@@ -2047,11 +2048,12 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                                     ],
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _showDeleteFlashcardDialog(flashcard),
-                                  tooltip: 'Xóa thẻ ghi nhớ',
-                                ),
+                                if (_isCourseClosed)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _showDeleteFlashcardDialog(flashcard),
+                                    tooltip: 'Xóa thẻ ghi nhớ',
+                                  ),
                               ],
                             ),
                         ],
@@ -2108,11 +2110,12 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                ElevatedButton.icon(
-                  onPressed: _showAddExerciseDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Thêm bài tập'),
-                ),
+                if (_isCourseClosed)
+                  ElevatedButton.icon(
+                    onPressed: _showAddExerciseDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Thêm bài tập'),
+                  ),
               ],
             ),
           ),

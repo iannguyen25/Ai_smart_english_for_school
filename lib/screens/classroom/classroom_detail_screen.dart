@@ -1122,7 +1122,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen>
                           ),
                         ],
                       ),
-                      if (_isTeacher)
+                      if (_isTeacher && !_isCourseClosed)
                         ElevatedButton.icon(
                           onPressed: () => _showCreateLessonDialog(),
                           icon: const Icon(Icons.add, size: 16),

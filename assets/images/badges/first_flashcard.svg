@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#4CAF50" />
+  
+  <!-- Flashcard icon -->
+  <rect x="60" y="70" width="80" height="60" rx="5" fill="white" />
+  <line x1="70" y1="90" x2="130" y2="90" stroke="#4CAF50" stroke-width="4" />
+  <line x1="70" y1="110" x2="130" y2="110" stroke="#4CAF50" stroke-width="4" />
+  
+  <!-- Star -->
+  <path d="M100 40 L105 55 L120 55 L110 65 L115 80 L100 70 L85 80 L90 65 L80 55 L95 55 Z" fill="white" />
+</svg> 

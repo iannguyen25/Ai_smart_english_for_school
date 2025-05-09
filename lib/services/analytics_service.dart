@@ -7,6 +7,8 @@ import '../models/exercise_attempt.dart';
 import '../models/feedback.dart' as app_models;
 import 'lesson_service.dart';
 import 'user_service.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class AnalyticsService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -1106,7 +1108,7 @@ class AnalyticsService {
 
       // Calculate viewed percentage
       final viewedPercentage = totalCards > 0 ? viewedCards / totalCards : 0.0;
-      final isCompleted = viewedPercentage >= 0.8 || action == 'completed'; // Thêm điều kiện action completed
+      final isCompleted = viewedPercentage >= 0.8 || action == 'completed';
       
       print('DEBUG: Calculated metrics:');
       print('- Viewed Percentage: ${(viewedPercentage * 100).toStringAsFixed(1)}%');
@@ -1132,55 +1134,176 @@ class AnalyticsService {
       print('DEBUG: Flashcard activity tracked successfully');
       print('- Tracking Document ID: ${trackingDoc.id}');
       
-      // Nếu flashcard hoàn thành (xem hơn 80% hoặc action là completed), cập nhật learning_progress
+      // Nếu flashcard hoàn thành, kiểm tra và trao huy hiệu
       if (isCompleted) {
-        print('DEBUG: Flashcard completed, updating learning progress');
-        final progressQuery = await _firestore
-            .collection('learning_progress')
+        print('DEBUG: Flashcard is completed, checking for badge eligibility');
+        
+        // Kiểm tra xem đây có phải là flashcard đầu tiên người dùng hoàn thành không
+        final previousCompletions = await _firestore
+            .collection('user_flashcard_tracking')
             .where('userId', isEqualTo: userId)
-            .where('lessonId', isEqualTo: lessonId)
-            .where('classroomId', isEqualTo: classroomId)
+            .where('isCompleted', isEqualTo: true)
             .get();
             
-        if (progressQuery.docs.isNotEmpty) {
-          final progressId = progressQuery.docs.first.id;
-          final progressData = progressQuery.docs.first.data();
+        print('DEBUG: Found ${previousCompletions.docs.length} previous completed flashcards');
+        
+        // Nếu đây là flashcard đầu tiên hoàn thành
+        if (previousCompletions.docs.length == 1) {
+          print('DEBUG: This is the first flashcard completion');
           
-          print('DEBUG: Found existing learning progress:');
-          print('- Progress ID: $progressId');
-          print('- Current progress data: $progressData');
+          // Tìm huy hiệu "Khởi đầu" bằng requirements.type
+          final badgeQuery = await _firestore
+              .collection('badges')
+              .where('requirements.type', isEqualTo: 'first_flashcard_completion')
+              .get();
+              
+          print('DEBUG: Found ${badgeQuery.docs.length} badges with type first_flashcard_completion');
           
-          // Lấy completedItemIds hoặc tạo mới nếu chưa có
-          Map<String, dynamic> completedItemIds = 
-            (progressData['completedItemIds'] as Map<String, dynamic>?) ?? {};
-          
-          // Đánh dấu flashcard đã xem
-          completedItemIds['flashcards'] = true;
-          
-          // Tính lại phần trăm hoàn thành
-          int completedItems = completedItemIds.values.where((value) => value == true).length;
-          int totalItems = 3; // Cố định số lượng items (video, flashcards, exercises)
-          double progressPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-          
-          print('DEBUG: Updating learning progress:');
-          print('- Completed Items: $completedItems/$totalItems');
-          print('- Progress Percent: ${progressPercent.toStringAsFixed(1)}%');
-          print('- Completed Item IDs: $completedItemIds');
-          
-          // Cập nhật tiến độ học tập
-          await _firestore.collection('learning_progress').doc(progressId).update({
-            'completedItemIds': completedItemIds,
-            'completedItems': completedItems,
-            'totalItems': totalItems,
-            'progressPercent': progressPercent,
-            'lastAccessTime': Timestamp.fromDate(timestamp),
-            'status': progressPercent >= 70 ? 'completed' : 'inProgress',
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          
-          print('DEBUG: Learning progress updated successfully');
+          if (badgeQuery.docs.isNotEmpty) {
+            final badgeId = badgeQuery.docs.first.id;
+            final badgeData = badgeQuery.docs.first.data();
+            print('DEBUG: Found first flashcard badge: ${badgeData['name']} (ID: $badgeId)');
+            print('DEBUG: Badge data: $badgeData');
+            
+            // Kiểm tra xem người dùng đã có huy hiệu này chưa
+            final existingBadge = await _firestore
+                .collection('user_badges')
+                .where('userId', isEqualTo: userId)
+                .where('badgeId', isEqualTo: badgeId)
+                .limit(1)
+                .get();
+                
+            print('DEBUG: User has ${existingBadge.docs.length} existing badges');
+            
+            // Nếu chưa có, trao huy hiệu
+            if (existingBadge.docs.isEmpty) {
+              print('DEBUG: First flashcard badge not found in database');
+              print('DEBUG: Creating new first flashcard badge');
+              
+              try {
+                // Tạo huy hiệu mới
+                final badgeDoc = await _firestore.collection('badges').add({
+                  'name': 'Khởi đầu',
+                  'description': 'Lần đầu học Flashcard',
+                  'iconUrl': 'https://firebasestorage.googleapis.com/v0/b/la-english.firebasestorage.app/o/badges%2F1746771139233.png?alt=media&token=26ce6e8e-52aa-45b6-87b7-38287e3605cc',
+                  'type': 'activity',
+                  'requirements': {
+                    'type': 'first_flashcard_completion',
+                  },
+                  'isOneTime': true,
+                  'isHidden': false,
+                  'createdAt': FieldValue.serverTimestamp(),
+                  'updatedAt': FieldValue.serverTimestamp(),
+                });
+                
+                print('DEBUG: Created new first flashcard badge with ID: ${badgeDoc.id}');
+                
+                // Trao huy hiệu cho người dùng
+                final userBadgeDoc = await _firestore.collection('user_badges').add({
+                  'userId': userId,
+                  'badgeId': badgeDoc.id,
+                  'earnedAt': Timestamp.fromDate(timestamp),
+                  'createdAt': FieldValue.serverTimestamp(),
+                  'updatedAt': FieldValue.serverTimestamp(),
+                });
+                
+                print('DEBUG: Successfully awarded new first flashcard badge to user');
+                print('DEBUG: User badge document created with ID: ${userBadgeDoc.id}');
+                
+                // Cập nhật danh sách huy hiệu trong user document
+                await _firestore.collection('users').doc(userId).update({
+                  'badges': FieldValue.arrayUnion([badgeDoc.id]),
+                  'updatedAt': FieldValue.serverTimestamp(),
+                });
+                print('DEBUG: Updated user document with new badge');
+
+                // Hiển thị dialog chúc mừng
+                _showBadgeCongratulationsDialog('Khởi đầu', 'https://firebasestorage.googleapis.com/v0/b/la-english.firebasestorage.app/o/badges%2F1746771139233.png?alt=media&token=26ce6e8e-52aa-45b6-87b7-38287e3605cc');
+                print('DEBUG: Showing congratulation dialog');
+
+                // Tạo thông báo chúc mừng
+                await _firestore.collection('notifications').add({
+                  'userId': userId,
+                  'type': 'badge_earned',
+                  'title': 'Chúc mừng! 🎉',
+                  'message': 'Bạn đã nhận được huy hiệu "Khởi đầu" cho việc hoàn thành flashcard đầu tiên!',
+                  'badgeId': badgeDoc.id,
+                  'badgeName': 'Khởi đầu',
+                  'badgeIconUrl': 'https://firebasestorage.googleapis.com/v0/b/la-english.firebasestorage.app/o/badges%2F1746771139233.png?alt=media&token=26ce6e8e-52aa-45b6-87b7-38287e3605cc',
+                  'createdAt': FieldValue.serverTimestamp(),
+                  'read': false,
+                });
+                print('DEBUG: Created congratulation notification for user');
+              } catch (e) {
+                print('DEBUG: Error creating and awarding badge: $e');
+              }
+            } else {
+              print('DEBUG: User already has first flashcard badge: ${badgeData['name']}');
+            }
+          } else {
+            print('DEBUG: First flashcard badge not found in database');
+            print('DEBUG: Creating new first flashcard badge');
+            
+            try {
+              // Tạo huy hiệu mới
+              final badgeDoc = await _firestore.collection('badges').add({
+                'name': 'Khởi đầu',
+                'description': 'Lần đầu học Flashcard',
+                'iconUrl': 'https://firebasestorage.googleapis.com/v0/b/la-english.firebasestorage.app/o/badges%2F1746771139233.png?alt=media&token=26ce6e8e-52aa-45b6-87b7-38287e3605cc',
+                'type': 'activity',
+                'requirements': {
+                  'type': 'first_flashcard_completion',
+                },
+                'isOneTime': true,
+                'isHidden': false,
+                'createdAt': FieldValue.serverTimestamp(),
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+              
+              print('DEBUG: Created new first flashcard badge with ID: ${badgeDoc.id}');
+              
+              // Trao huy hiệu cho người dùng
+              final userBadgeDoc = await _firestore.collection('user_badges').add({
+                'userId': userId,
+                'badgeId': badgeDoc.id,
+                'earnedAt': Timestamp.fromDate(timestamp),
+                'createdAt': FieldValue.serverTimestamp(),
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+              
+              print('DEBUG: Successfully awarded new first flashcard badge to user');
+              print('DEBUG: User badge document created with ID: ${userBadgeDoc.id}');
+              
+              // Cập nhật danh sách huy hiệu trong user document
+              await _firestore.collection('users').doc(userId).update({
+                'badges': FieldValue.arrayUnion([badgeDoc.id]),
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+              print('DEBUG: Updated user document with new badge');
+
+              // Hiển thị dialog chúc mừng
+              _showBadgeCongratulationsDialog('Khởi đầu', 'https://firebasestorage.googleapis.com/v0/b/la-english.firebasestorage.app/o/badges%2F1746771139233.png?alt=media&token=26ce6e8e-52aa-45b6-87b7-38287e3605cc');
+              print('DEBUG: Showing congratulation dialog');
+
+              // Tạo thông báo chúc mừng
+              await _firestore.collection('notifications').add({
+                'userId': userId,
+                'type': 'badge_earned',
+                'title': 'Chúc mừng! 🎉',
+                'message': 'Bạn đã nhận được huy hiệu "Khởi đầu" cho việc hoàn thành flashcard đầu tiên!',
+                'badgeId': badgeDoc.id,
+                'badgeName': 'Khởi đầu',
+                'badgeIconUrl': 'https://firebasestorage.googleapis.com/v0/b/la-english.firebasestorage.app/o/badges%2F1746771139233.png?alt=media&token=26ce6e8e-52aa-45b6-87b7-38287e3605cc',
+                'createdAt': FieldValue.serverTimestamp(),
+                'read': false,
+              });
+              print('DEBUG: Created congratulation notification for user');
+            } catch (e) {
+              print('DEBUG: Error creating and awarding badge: $e');
+            }
+          }
         } else {
-          print('DEBUG: No learning progress found to update');
+          print('DEBUG: Not the first flashcard completion (previous completions: ${previousCompletions.docs.length})');
         }
       }
       
@@ -1323,5 +1446,71 @@ class AnalyticsService {
       print('ERROR tracking quiz activity: $e');
       print('DEBUG: ====== QUIZ TRACKING FAILED ======');
     }
+  }
+
+  // Hiển thị dialog chúc mừng
+  void _showBadgeCongratulationsDialog(String badgeName, String badgeIconUrl) {
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon huy hiệu
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  image: DecorationImage(
+                    image: NetworkImage(badgeIconUrl),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+              // Tiêu đề
+              Text(
+                'Chúc mừng! 🎉',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                ),
+              ),
+              SizedBox(height: 10),
+              // Nội dung
+              Text(
+                'Bạn đã nhận được huy hiệu\n"$badgeName"',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.black87,
+                ),
+              ),
+              SizedBox(height: 20),
+              // Nút đóng
+              ElevatedButton(
+                onPressed: () => Get.back(),
+                child: Text('Tuyệt vời!'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
   }
 } 
