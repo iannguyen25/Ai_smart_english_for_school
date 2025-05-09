@@ -59,14 +59,21 @@ class BadgeService {
   
   // Tạo huy hiệu mới
   Future<Badge?> createBadge({
-    required String name,
-    required String description,
-    required String iconUrl,
+    required String? name,
+    required String? description,
+    required String? iconUrl,
     required BadgeType type,
     required Map<String, dynamic> requirements,
-    bool isHidden = false,
-    bool isOneTime = true,
+    required bool isHidden,
+    required bool isOneTime,
   }) async {
+    if (name == null || name.isEmpty || 
+        description == null || description.isEmpty || 
+        iconUrl == null || iconUrl.isEmpty) {
+      print('Error creating badge: Required fields are empty');
+      return null;
+    }
+    
     try {
       final badgeDoc = await _badgesCollection.add({
         'name': name,
@@ -192,6 +199,70 @@ class BadgeService {
     }
   }
   
+  // Cập nhật huy hiệu
+  Future<Badge?> updateBadge({
+    required String badgeId,
+    required String? name,
+    required String? description,
+    required String? iconUrl,
+    required BadgeType type,
+    required Map<String, dynamic> requirements,
+    required bool isHidden,
+    required bool isOneTime,
+  }) async {
+    if (name == null || name.isEmpty || 
+        description == null || description.isEmpty || 
+        iconUrl == null || iconUrl.isEmpty) {
+      print('Error updating badge: Required fields are empty');
+      return null;
+    }
+    
+    try {
+      final badgeDoc = await _badgesCollection.doc(badgeId).get();
+      if (!badgeDoc.exists) return null;
+      
+      final updatedData = {
+        'name': name,
+        'description': description,
+        'iconUrl': iconUrl,
+        'type': _badgeTypeToString(type),
+        'requirements': requirements,
+        'isHidden': isHidden,
+        'isOneTime': isOneTime,
+        'updatedAt': Timestamp.now(),
+      };
+      
+      await _badgesCollection.doc(badgeId).update(updatedData);
+      
+      return Badge.fromMap(updatedData, badgeId);
+    } catch (e) {
+      print('Error updating badge: $e');
+      return null;
+    }
+  }
+  
+  // Xóa huy hiệu
+  Future<bool> deleteBadge(String badgeId) async {
+    try {
+      // Kiểm tra xem có người dùng nào đang sở hữu huy hiệu này không
+      final userBadges = await _userBadgesCollection
+          .where('badgeId', isEqualTo: badgeId)
+          .limit(1)
+          .get();
+      
+      if (userBadges.docs.isNotEmpty) {
+        print('Cannot delete badge: Some users are still using this badge');
+        return false;
+      }
+      
+      await _badgesCollection.doc(badgeId).delete();
+      return true;
+    } catch (e) {
+      print('Error deleting badge: $e');
+      return false;
+    }
+  }
+  
   // Lấy danh sách huy hiệu người dùng với chi tiết
   Future<List<Map<String, dynamic>>> getUserBadgesWithDetails({String? userId}) async {
     try {
@@ -239,6 +310,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/streak_5.png',
         type: BadgeType.streak,
         requirements: {'streakDays': 5},
+        isHidden: false,
+        isOneTime: true,
       );
       
       await createBadge(
@@ -247,6 +320,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/streak_10.png',
         type: BadgeType.streak,
         requirements: {'streakDays': 10},
+        isHidden: false,
+        isOneTime: true,
       );
       
       await createBadge(
@@ -255,6 +330,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/streak_30.png',
         type: BadgeType.streak,
         requirements: {'streakDays': 30},
+        isHidden: false,
+        isOneTime: true,
       );
       
       // Huy hiệu hoàn thành
@@ -264,6 +341,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/first_lesson.png',
         type: BadgeType.completion,
         requirements: {'completedLessons': 1},
+        isHidden: false,
+        isOneTime: true,
       );
       
       await createBadge(
@@ -272,6 +351,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/weekly_completion.png',
         type: BadgeType.completion,
         requirements: {'completedLessonsWeekly': 7},
+        isHidden: false,
+        isOneTime: true,
       );
       
       // Huy hiệu hiệu suất
@@ -281,6 +362,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/perfect_score.png',
         type: BadgeType.performance,
         requirements: {'perfectScore': true},
+        isHidden: false,
+        isOneTime: true,
       );
       
       await createBadge(
@@ -289,6 +372,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/speed.png',
         type: BadgeType.performance,
         requirements: {'completionTime': 5},
+        isHidden: false,
+        isOneTime: true,
       );
       
       // Huy hiệu hoạt động
@@ -298,6 +383,8 @@ class BadgeService {
         iconUrl: 'assets/images/badges/flashcard_master.png',
         type: BadgeType.activity,
         requirements: {'flashcardSets': 10},
+        isHidden: false,
+        isOneTime: true,
       );
       
       print('Created default badges');

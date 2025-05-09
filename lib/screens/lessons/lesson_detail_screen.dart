@@ -2608,7 +2608,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
   void _showAddExerciseDialog() {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
-    
+    final timeLimitController = TextEditingController();
+
     Get.dialog(
       AlertDialog(
         title: const Text('Thêm bài tập'),
@@ -2630,6 +2631,14 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                 hintText: 'Nhập mô tả ngắn gọn',
               ),
               maxLines: 3,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: timeLimitController,
+              decoration: const InputDecoration(
+                labelText: 'Thời gian làm bài (phút)',
+                hintText: 'Nhập thời gian làm bài',
+              ),
             ),
           ],
         ),
@@ -2657,6 +2666,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> with SingleTick
                 classroomId: widget.classroomId,
                 initialTitle: titleController.text.trim(),
                 initialDescription: descriptionController.text.trim(),
+                initialTimeLimit: timeLimitController.text.trim(),
               ));
 
               if (result == true) {

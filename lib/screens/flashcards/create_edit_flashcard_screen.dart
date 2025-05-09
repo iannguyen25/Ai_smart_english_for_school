@@ -18,6 +18,7 @@ class CreateEditFlashcardScreen extends StatefulWidget {
   final String? initialDescription;
   final String? lessonId;
   final String? classroomId;
+  final bool isSample;
 
   const CreateEditFlashcardScreen({
     Key? key, 
@@ -26,6 +27,7 @@ class CreateEditFlashcardScreen extends StatefulWidget {
     this.initialDescription,
     this.lessonId,
     this.classroomId,
+    this.isSample = false,
   }) : super(key: key);
 
   @override
@@ -121,47 +123,16 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
     
     print('=== Validating Flashcard Items ===');
     for (var item in _items) {
-      print('Item type: ${item.type}');
-      print('Item data: ${item.toMap()}');
-      
-      switch (item.type) {
-        case FlashcardItemType.textToText:
-          if (item.question.isNotEmpty && item.answer.isNotEmpty) {
-            hasValidItems = true;
-          }
-          break;
-        case FlashcardItemType.imageToText:
-          if (item.questionImage != null && item.questionImage!.isNotEmpty && item.answer.isNotEmpty) {
-            hasValidItems = true;
-          } else if (item.questionImage == null || item.questionImage!.isEmpty) {
-            validationError = 'Vui lòng tải lên ảnh cho thẻ kiểu Ảnh - Chữ';
-          }
-          break;
-        case FlashcardItemType.imageToImage:
-          print('Checking imageToImage item:');
-          print('Question image: ${item.questionImage}');
-          print('Answer image: ${item.answerImage}');
-          if (item.questionImage != null && item.questionImage!.isNotEmpty &&
-              item.answerImage != null && item.answerImage!.isNotEmpty) {
-            hasValidItems = true;
-          } else {
-            validationError = 'Vui lòng tải lên cả ảnh từ vựng và ảnh minh họa cho thẻ kiểu Ảnh - Ảnh';
-          }
-          break;
+      if (item.type == FlashcardItemType.textToText && 
+          item.question.isNotEmpty && item.answer.isNotEmpty) {
+        hasValidItems = true;
+        break;
       }
-      if (validationError != null) break;
-    }
-
-    if (validationError != null) {
-      setState(() {
-        _errorMessage = validationError;
-      });
-      return;
     }
 
     if (!hasValidItems) {
       setState(() {
-        _errorMessage = 'Vui lòng thêm ít nhất một thẻ với đầy đủ thông tin';
+        validationError = 'Vui lòng nhập ít nhất một cặp câu hỏi - đáp án';
       });
       return;
     }
@@ -182,7 +153,7 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
           description: _descriptionController.text.trim(),
           isPublic: _isPublic,
           updatedAt: DateTime.now(),
-          approvalStatus: ApprovalStatus.pending,
+          approvalStatus: widget.isSample ? ApprovalStatus.approved : ApprovalStatus.pending,
         );
 
         await _flashcardService.updateFlashcard(updatedFlashcard);
@@ -223,29 +194,43 @@ class _CreateEditFlashcardScreenState extends State<CreateEditFlashcardScreen> {
           isPublic: _isPublic,
           lessonId: widget.lessonId,
           classroomId: widget.classroomId,
-          approvalStatus: ApprovalStatus.pending,
+          isSample: widget.isSample,
+          approvalStatus: widget.isSample ? ApprovalStatus.approved : ApprovalStatus.pending,
         );
 
         // Tạo flashcard trước để lấy ID
         final flashcardId = await _flashcardService.createFlashcard(newFlashcard);
         print('Created flashcard with ID: $flashcardId');
 
-        // Tạo các thẻ với flashcardId mới
-        for (var item in _items) {
-          // Bỏ qua các thẻ trống
-          if (item.type == FlashcardItemType.textToText && 
-              item.question.isEmpty && item.answer.isEmpty) continue;
-          if (item.type == FlashcardItemType.imageToText && 
-              (item.questionImage == null || item.questionImage!.isEmpty || item.answer.isEmpty)) continue;
-          if (item.type == FlashcardItemType.imageToImage && 
-              (item.questionImage == null || item.questionImage!.isEmpty || 
-               item.answerImage == null || item.answerImage!.isEmpty)) continue;
+        if (flashcardId != null) {
+          // Tạo các thẻ với flashcardId mới
+          for (var item in _items) {
+            // Bỏ qua các thẻ trống
+            if (item.type == FlashcardItemType.textToText && 
+                item.question.isEmpty && item.answer.isEmpty) continue;
+            if (item.type == FlashcardItemType.imageToText && 
+                (item.questionImage == null || item.questionImage!.isEmpty || item.answer.isEmpty)) continue;
+            if (item.type == FlashcardItemType.imageToImage && 
+                (item.questionImage == null || item.questionImage!.isEmpty || 
+                 item.answerImage == null || item.answerImage!.isEmpty)) continue;
 
-          print('Creating new item for new flashcard');
-          print('Item type: ${item.type}');
-          print('Item data: ${item.toMap()}');
-          final newItem = item.copyWith(flashcardId: flashcardId);
-          await _flashcardService.createFlashcardItem(newItem);
+            print('Creating new item for new flashcard');
+            print('Item type: ${item.type}');
+            print('Item data: ${item.toMap()}');
+            final newItem = item.copyWith(flashcardId: flashcardId);
+            await _flashcardService.createFlashcardItem(newItem);
+          }
+
+          // Cập nhật lesson với flashcardId mới
+          if (widget.lessonId != null) {
+            await FirebaseFirestore.instance
+                .collection('lessons')
+                .doc(widget.lessonId)
+                .update({
+              'flashcardIds': FieldValue.arrayUnion([flashcardId]),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
         }
       }
 

@@ -1,4 +1,6 @@
 import 'package:base_flutter_framework/screens/admin/admin_dashboard_screen.dart';
+import 'package:base_flutter_framework/screens/admin/badge_management_screen.dart';
+import 'package:base_flutter_framework/screens/admin/sample_content_management_screen.dart';
 import 'package:base_flutter_framework/screens/flashcards/create_edit_flashcard_screen.dart';
 import 'package:base_flutter_framework/screens/folder/create_edit_folder_screen.dart';
 import 'package:base_flutter_framework/screens/home/tabs/ai_chat_tab.dart';
@@ -326,6 +328,20 @@ class _DashboardTabState extends State<DashboardTab> {
                     title: 'Dashboard tổng quan',
                     subtitle: 'Duyệt và quản lý nội dung',
                     onTap: () => Get.to(() => const AdminDashboardScreen()),
+                    color: Colors.purple,
+                  ),
+                  _buildQuickActionCard(
+                    icon: Icons.article,
+                    title: 'Quản lý nội dung mẫu',
+                    subtitle: 'Duyệt và quản lý nội dung mẫu',
+                    onTap: () => Get.to(() => const SampleContentManagementScreen()),
+                    color: Colors.purple,
+                  ),
+                  _buildQuickActionCard(
+                    icon: Icons.article,
+                    title: 'Quản lý huy hiệu',
+                    subtitle: 'Duyệt và quản lý huy hiệu',
+                    onTap: () => Get.to(() => const BadgeManagementScreen()),
                     color: Colors.purple,
                   ),
                 ],

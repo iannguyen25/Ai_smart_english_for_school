@@ -461,6 +461,27 @@ class ClassroomService {
           // Tạo flashcard mới
           final newFlashcardRef = await _firestore.collection('flashcards').add(flashcardData);
           newFlashcardIds.add(newFlashcardRef.id);
+
+          // Sao chép flashcard items từ collection flashcard_items
+          print('Tìm kiếm flashcard items cho flashcard ID: ${doc.id}');
+          final itemsSnapshot = await _firestore
+              .collection('flashcard_items')
+              .where('flashcardId', isEqualTo: doc.id)
+              .get();
+
+          print('Tìm thấy ${itemsSnapshot.docs.length} flashcard items');
+          if (itemsSnapshot.docs.isNotEmpty) {
+            for (final itemDoc in itemsSnapshot.docs) {
+              final itemData = Map<String, dynamic>.from(itemDoc.data());
+              print('Sao chép flashcard item: ${itemData['question']}');
+              itemData['flashcardId'] = newFlashcardRef.id;
+              itemData['createdAt'] = FieldValue.serverTimestamp();
+              itemData['updatedAt'] = FieldValue.serverTimestamp();
+
+              final newItemRef = await _firestore.collection('flashcard_items').add(itemData);
+              print('Đã tạo flashcard item mới với ID: ${newItemRef.id}');
+            }
+          }
         }
       }
       
@@ -522,6 +543,153 @@ class ClassroomService {
         rethrow;
       }
       throw 'Không thể mời học sinh tham gia lớp học';
+    }
+  }
+
+  // Thêm phương thức để thêm lesson vào classroom
+  Future<void> addLessonToClassroom(String classroomId, String lessonId) async {
+    try {
+      print('Bắt đầu thêm bài học mẫu vào lớp học...');
+      print('Classroom ID: $classroomId');
+      print('Lesson ID: $lessonId');
+
+      // Lấy thông tin bài học mẫu
+      final lessonDoc = await _firestore.collection('lessons').doc(lessonId).get();
+      if (!lessonDoc.exists) {
+        throw Exception('Không tìm thấy bài học mẫu');
+      }
+
+      final lessonData = lessonDoc.data()!;
+      print('Lesson data: $lessonData');
+
+      // Tạo bản sao của bài học
+      final newLessonData = Map<String, dynamic>.from(lessonData);
+      newLessonData['classroomId'] = classroomId;
+      newLessonData['isCustom'] = true;
+      newLessonData['createdAt'] = FieldValue.serverTimestamp();
+      newLessonData['updatedAt'] = FieldValue.serverTimestamp();
+
+      // Tạo bài học mới
+      final newLessonRef = await _firestore.collection('lessons').add(newLessonData);
+      final newLessonId = newLessonRef.id;
+      print('Đã tạo bài học mới với ID: $newLessonId');
+
+      // Sao chép video
+      final videoItems = List<Map<String, dynamic>>.from(lessonData['videoItems'] ?? []);
+      if (videoItems.isNotEmpty) {
+        print('Sao chép ${videoItems.length} video...');
+        await newLessonRef.update({
+          'videoItems': videoItems,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Sao chép flashcard
+      final flashcardIds = List<String>.from(lessonData['flashcardIds'] ?? []);
+      if (flashcardIds.isNotEmpty) {
+        print('Sao chép ${flashcardIds.length} flashcard...');
+        List<String> newFlashcardIds = [];
+
+        for (final flashcardId in flashcardIds) {
+          final flashcardDoc = await _firestore.collection('flashcards').doc(flashcardId).get();
+          if (flashcardDoc.exists) {
+            final flashcardData = Map<String, dynamic>.from(flashcardDoc.data()!);
+            flashcardData['classroomId'] = classroomId;
+            flashcardData['lessonId'] = newLessonId;
+            flashcardData['isCustom'] = true;
+            flashcardData['createdAt'] = FieldValue.serverTimestamp();
+            flashcardData['updatedAt'] = FieldValue.serverTimestamp();
+
+            // Tạo flashcard mới
+            final newFlashcardRef = await _firestore.collection('flashcards').add(flashcardData);
+            newFlashcardIds.add(newFlashcardRef.id);
+
+            // Sao chép flashcard items từ collection flashcard_items
+            print('Tìm kiếm flashcard items cho flashcard ID: $flashcardId');
+            final itemsSnapshot = await _firestore
+                .collection('flashcard_items')
+                .where('flashcardId', isEqualTo: flashcardId)
+                .get();
+
+            print('Tìm thấy ${itemsSnapshot.docs.length} flashcard items');
+            if (itemsSnapshot.docs.isNotEmpty) {
+              for (final itemDoc in itemsSnapshot.docs) {
+                final itemData = Map<String, dynamic>.from(itemDoc.data());
+                print('Sao chép flashcard item: ${itemData['question']}');
+                itemData['flashcardId'] = newFlashcardRef.id;
+                itemData['createdAt'] = FieldValue.serverTimestamp();
+                itemData['updatedAt'] = FieldValue.serverTimestamp();
+
+                final newItemRef = await _firestore.collection('flashcard_items').add(itemData);
+                print('Đã tạo flashcard item mới với ID: ${newItemRef.id}');
+              }
+            }
+          }
+        }
+
+        await newLessonRef.update({
+          'flashcardIds': newFlashcardIds,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Sao chép bài tập
+      final exerciseIds = List<String>.from(lessonData['exerciseIds'] ?? []);
+      if (exerciseIds.isNotEmpty) {
+        print('Sao chép ${exerciseIds.length} bài tập...');
+        List<String> newExerciseIds = [];
+
+        for (final exerciseId in exerciseIds) {
+          final exerciseDoc = await _firestore.collection('exercises').doc(exerciseId).get();
+          if (exerciseDoc.exists) {
+            final exerciseData = Map<String, dynamic>.from(exerciseDoc.data()!);
+            exerciseData['classroomId'] = classroomId;
+            exerciseData['lessonId'] = newLessonId;
+            exerciseData['isCustom'] = true;
+            exerciseData['createdAt'] = FieldValue.serverTimestamp();
+            exerciseData['updatedAt'] = FieldValue.serverTimestamp();
+
+            // Tạo bài tập mới
+            final newExerciseRef = await _firestore.collection('exercises').add(exerciseData);
+            newExerciseIds.add(newExerciseRef.id);
+
+            // Sao chép câu hỏi từ exercise_questions collection
+            final questionsSnapshot = await _firestore
+                .collection('exercise_questions')
+                .where('exerciseId', isEqualTo: exerciseId)
+                .orderBy('orderIndex')
+                .get();
+
+            if (questionsSnapshot.docs.isNotEmpty) {
+              print('Sao chép ${questionsSnapshot.docs.length} câu hỏi...');
+              for (final questionDoc in questionsSnapshot.docs) {
+                final questionData = Map<String, dynamic>.from(questionDoc.data());
+                questionData['exerciseId'] = newExerciseRef.id;
+                questionData['createdAt'] = FieldValue.serverTimestamp();
+                questionData['updatedAt'] = FieldValue.serverTimestamp();
+
+                await _firestore.collection('exercise_questions').add(questionData);
+              }
+            }
+          }
+        }
+
+        await newLessonRef.update({
+          'exerciseIds': newExerciseIds,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Cập nhật classroom với lessonId mới
+      await _firestore.collection('classrooms').doc(classroomId).update({
+        'lessonIds': FieldValue.arrayUnion([newLessonId]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('Đã hoàn thành việc thêm bài học mẫu vào lớp học');
+    } catch (e) {
+      print('Error adding lesson to classroom: $e');
+      throw Exception('Không thể thêm bài học vào lớp học: $e');
     }
   }
 }

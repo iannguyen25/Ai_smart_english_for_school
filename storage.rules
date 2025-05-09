@@ -1,11 +1,16 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Cho phép đọc các file công khai
-    match /materials/{userId}/{fileName} {
+  
+  	match /materials/{userId}/{fileName} {
       // Cho phép tải lên và chỉnh sửa cho chính người dùng đó
       allow read: if true; // Mọi người đều đọc được
       allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Quy tắc mặc định - từ chối tất cả
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
     
     // Cho phép đọc tất cả file nếu đã xác thực
@@ -37,23 +42,38 @@ service firebase.storage {
     match /flashcard_images/{fileName} {
       allow write: if request.auth != null;
     }
-    
+		
     // Cho phép upload ảnh đại diện (cấu trúc cũ)
     match /user_avatars/{fileName} {
       allow write: if request.auth != null;
     }
     
-    // Quy tắc mặc định - từ chối tất cả
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
-
     match /flashcards/{userId}/{flashcardId}/{fileName} {
       allow read: if true;
       allow write: if request.auth != null 
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
+    }
+    
+    // Hàm kiểm tra người dùng đã đăng nhập
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Hàm kiểm tra người dùng là admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.roleId == 'admin';
+    }
+
+    // Rules cho thư mục badges
+    match /badges/{imageId} {
+      // Cho phép đọc nếu đã đăng nhập
+      allow read: if isAuthenticated();
+      
+      // Cho phép tải lên và xóa nếu là admin
+      allow write, delete: if isAdmin();
     }
   }
 } 

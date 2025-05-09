@@ -80,4 +80,35 @@ class StorageService {
       return null;
     }
   }
+
+  // Tải ảnh lên Firebase Storage
+  Future<String?> uploadImage(File imageFile, String folder) async {
+    try {
+      // Tạo tên file duy nhất bằng timestamp
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}${path.extension(imageFile.path)}';
+      final storageRef = _storage.ref().child('$folder/$fileName');
+      
+      // Tải file lên
+      final uploadTask = await storageRef.putFile(imageFile);
+      
+      // Lấy URL của file đã tải lên
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print('Error uploading image: $e');
+      return null;
+    }
+  }
+  
+  // Xóa ảnh từ Firebase Storage
+  Future<bool> deleteImage(String imageUrl) async {
+    try {
+      final ref = _storage.refFromURL(imageUrl);
+      await ref.delete();
+      return true;
+    } catch (e) {
+      print('Error deleting image: $e');
+      return false;
+    }
+  }
 }

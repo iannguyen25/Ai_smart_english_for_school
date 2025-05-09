@@ -10,6 +10,7 @@ class Flashcard {
   final String userId;
   final List<FlashcardItem>? items;
   final bool isPublic;
+  final bool isSample;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? lessonId;
@@ -24,6 +25,7 @@ class Flashcard {
     required this.userId,
     this.items,
     this.isPublic = false,
+    this.isSample = false,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.lessonId,
@@ -33,23 +35,24 @@ class Flashcard {
   })  : this.createdAt = createdAt ?? DateTime.now(),
         this.updatedAt = updatedAt ?? DateTime.now();
 
-  factory Flashcard.fromMap(Map<String, dynamic> map, [String? id]) {
+  factory Flashcard.fromMap(Map<String, dynamic> map, String documentId) {
     return Flashcard(
-      id: id,
+      id: documentId,
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       userId: map['userId'] ?? '',
       items: null,
       isPublic: map['isPublic'] ?? false,
+      isSample: map['isSample'] ?? false,
+      approvalStatus: ApprovalStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == map['approvalStatus'],
+        orElse: () => ApprovalStatus.pending,
+      ),
+      rejectionReason: map['rejectionReason'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
       lessonId: map['lessonId'],
       classroomId: map['classroomId'],
-      approvalStatus: ApprovalStatus.values.firstWhere(
-        (e) => e.name == (map['approvalStatus'] ?? 'pending'),
-        orElse: () => ApprovalStatus.pending,
-      ),
-      rejectionReason: map['rejectionReason'],
     );
   }
 
@@ -60,21 +63,24 @@ class Flashcard {
       'userId': userId,
       'items': items?.map((item) => item.toMap()).toList(),
       'isPublic': isPublic,
+      'isSample': isSample,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'lessonId': lessonId,
       'classroomId': classroomId,
-      'approvalStatus': approvalStatus.name,
+      'approvalStatus': approvalStatus.toString().split('.').last,
       'rejectionReason': rejectionReason,
     };
   }
 
   Flashcard copyWith({
+    String? id,
     String? title,
     String? description,
     String? userId,
     List<FlashcardItem>? items,
     bool? isPublic,
+    bool? isSample,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? lessonId,
@@ -83,12 +89,13 @@ class Flashcard {
     String? rejectionReason,
   }) {
     return Flashcard(
-      id: this.id,
+      id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
       userId: userId ?? this.userId,
       items: items ?? this.items,
       isPublic: isPublic ?? this.isPublic,
+      isSample: isSample ?? this.isSample,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lessonId: lessonId ?? this.lessonId,

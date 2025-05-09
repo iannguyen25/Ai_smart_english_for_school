@@ -27,18 +27,19 @@ service cloud.firestore {
       return isAuthenticated() &&
         get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherId == request.auth.uid;
     }
+    
+    // Là giáo viên
+    function isTeacher() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId == 'teacher';
+    }
+
 
     // Khoá học có đang bị khoá hay không
     function isCourseClosed(classroomId) {
       let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId));
       let courseId = classroom.data.courseId;
       return courseId != null && get(/databases/$(database)/documents/courses/$(courseId)).data.isClosed == true;
-    }
-
-    // Là giáo viên
-    function isTeacher() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId == 'teacher';
     }
 
     // Admin có quyền truy cập tất cả collections
@@ -71,7 +72,7 @@ service cloud.firestore {
         // Là admin
         isAdmin() ||
         // Là người tạo lớp
-        isOwner(resource.data.teacherId) ||
+				isOwner(resource.data.teacherId) ||
         // Cho phép học sinh thêm mình vào pendingMemberIds
         (
           // Chỉ cho phép thêm vào pendingMemberIds
@@ -79,6 +80,11 @@ service cloud.firestore {
           // Đảm bảo chỉ thêm ID của chính mình
           request.resource.data.pendingMemberIds.hasAll(resource.data.pendingMemberIds) &&
           request.resource.data.pendingMemberIds.hasOnly(resource.data.pendingMemberIds.concat([request.auth.uid]))
+        ) ||
+        // Cho phép học sinh tự xóa mình khỏi memberIds
+        (
+          request.auth.uid in resource.data.memberIds &&
+          !(request.auth.uid in request.resource.data.memberIds)
         )
       );
       
@@ -91,6 +97,9 @@ service cloud.firestore {
       allow list: if isAuthenticated() && (
       	// Là admin
         isAdmin() ||
+        isTeacher() ||
+        // Là thành viên của lớp
+        isMember(resource.data.memberIds) ||
         // Là giáo viên lớp
         isTeacherOfClass(classroomId) ||
         // Giới hạn 50 kết quả
@@ -102,7 +111,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && isOwner(userId);
     }
-
+    
     match /roles/{roleId} {
       allow read: if isAuthenticated();
       allow write: if false;
@@ -121,7 +130,7 @@ service cloud.firestore {
       );
     }
 
-    match /flashcard_items/{itemId} {
+   match /flashcard_items/{itemId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && (
@@ -179,9 +188,12 @@ service cloud.firestore {
     }
     
     match /lessons/{lessonId} {
+    	allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isTeacher() || isAdmin());
       allow get: if isAuthenticated();
       allow list: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, delete: if isAuthenticated();
+      allow update: if isAuthenticated() && !isCourseClosed(resource.data.classroomId)
     }
 
     match /learning_progress/{progressId} {
@@ -249,8 +261,8 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId ||
         isAdmin()
       );
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
     }
     
     function isStudentInClassroom(classroomId) {
@@ -266,45 +278,70 @@ service cloud.firestore {
 
     // Exercises collection
     match /exercises/{exerciseId} {
-      allow read: if isAuthenticated() && (
-        resource.data.classroomId != null && isTeacherOfClass(resource.data.classroomId) ||
-        resource.data.classroomId != null && isStudentInClassroom(resource.data.classroomId) ||
-        resource.data.lessonId != null && isTeacherOfClass(getLessonClassroomId(resource.data.lessonId)) ||
-        resource.data.lessonId != null && isStudentInClassroom(getLessonClassroomId(resource.data.lessonId))
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated() && (isAdmin() || isTeacher());
+      allow list: if isAuthenticated() && (
+        request.query.limit <= 50
       );
     }
     
+    // Rules for exercise_attempts collection
     match /exercise_attempts/{attemptId} {
-      // Allow read if authenticated user is:
-      // 1. The owner of the attempt
-      // 2. A teacher of the classroom
+      // Allow read if:
+      // 1. User is authenticated AND
+      // 2. Either:
+      //    a. User is the owner of the attempt OR
+      //    b. User is a teacher of the classroom OR
+      //    c. User is an admin
       allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.userId ||
-        resource.data.classroomId != null && isTeacherOfClass(resource.data.classroomId)
+        resource.data.userId == request.auth.uid ||
+        isTeacher() ||
+        isTeacherOfClass(resource.data.classroomId) ||
+        isAdmin()
       );
 
-      // Allow create if the user is the owner
-      allow create: if isAuthenticated() && 
+      // Allow create if:
+      // 1. User is authenticated AND
+      // 2. User is creating their own attempt
+      allow create: if isAuthenticated() &&
         request.resource.data.userId == request.auth.uid;
 
-      // Allow update if the user is the owner
-      allow update: if isAuthenticated() && 
-        request.auth.uid == resource.data.userId;
+      // Allow update if:
+      // 1. User is authenticated AND
+      // 2. Either:
+      //    a. User is the owner of the attempt OR
+      //    b. User is a teacher of the classroom OR
+      //    c. User is an admin
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isTeacherOfClass(resource.data.classroomId) ||
+        isAdmin()
+      );
+
+      // Allow list if:
+      // 1. User is authenticated AND
+      // 2. Either:
+      //    a. User is a teacher of the classroom OR
+      //    b. User is an admin
+      allow list: if isAuthenticated() && (
+        isTeacherOfClass(resource.data.classroomId) ||
+        isAdmin()
+      );
     }
     
     // Exercise Questions collection
     match /exercise_questions/{questionId} {
-      allow read: if isAuthenticated() && (
-        resource.data.exerciseId != null && 
-        exists(/databases/$(database)/documents/exercises/$(resource.data.exerciseId)) &&
-        (
-          isTeacherOfClass(
-            get(/databases/$(database)/documents/exercises/$(resource.data.exerciseId)).data.classroomId
-          ) ||
-          isStudentInClassroom(
-            get(/databases/$(database)/documents/exercises/$(resource.data.exerciseId)).data.classroomId
-          )
-        )
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        isTeacher()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isAdmin() ||
+        isTeacher()
+      );
+      allow list: if isAuthenticated() && (
+        request.query.limit <= 50
       );
     }
     
@@ -394,7 +431,7 @@ service cloud.firestore {
         isAdmin()
       );
     }
-
+    
     // User streaks collection
     match /user_streaks/{userId} {
       allow read: if isAuthenticated() && (
@@ -412,7 +449,7 @@ service cloud.firestore {
         isAdmin()
       );
     }
-
+    
     // Quizzes collection
     match /quizzes/{quizId} {
       allow read: if isAuthenticated() && (
@@ -428,7 +465,7 @@ service cloud.firestore {
         isTeacher() || isAdmin()
       );
     }
-
+    
     match /quiz_attempts/{attemptId} {
       // Allow read if authenticated user is:
       // 1. The owner of the attempt
@@ -446,7 +483,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && 
         request.auth.uid == resource.data.userId;
     }
-
+    
     // User tokens collection for notifications
     match /user_tokens/{tokenId} {
       // Allow read if authenticated

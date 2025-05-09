@@ -7,6 +7,7 @@ import '../../services/classroom_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/course_service.dart';
+import '../../services/sample_content_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
@@ -30,6 +31,7 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
   final AuthService _authService = AuthService();
   final StorageService _storageService = StorageService();
   final CourseService _courseService = CourseService();
+  final SampleContentService _sampleContentService = SampleContentService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool _isPublic = false;
@@ -37,12 +39,17 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
   String? _errorMessage;
   String? _coverImagePath;
   bool get _isEditMode => widget.classroom != null;
+  bool _isCourseClosed = false;
 
   List<Course> _courses = [];
   Course? _selectedCourse;
   String? _inviteCode;
   File? _coverImageFile;
   String? _coverImageUrl;
+  
+  bool _useSampleContent = false;
+  List<Map<String, dynamic>> _sampleContents = [];
+  Map<String, dynamic>? _selectedSampleContent;
 
   @override
   void initState() {
@@ -123,6 +130,37 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
       }
     } catch (e) {
       print('Error loading selected course: $e');
+    }
+  }
+
+  Future<void> _loadSampleContents(String courseId) async {
+    try {
+      final contents = await _sampleContentService.getSampleContentByCourse(courseId);
+      setState(() {
+        _sampleContents = contents;
+        _selectedSampleContent = null;
+      });
+    } catch (e) {
+      print('Error loading sample contents: $e');
+      Get.snackbar(
+        'Lỗi',
+        'Không thể tải danh sách tài liệu mẫu: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  void _onCourseSelected(Course? course) {
+    setState(() {
+      _selectedCourse = course;
+      _useSampleContent = false;
+      _selectedSampleContent = null;
+      _sampleContents = [];
+      _isCourseClosed = course?.isClosed ?? false;
+    });
+    
+    if (course != null && course.id != null) {
+      _loadSampleContents(course.id!);
     }
   }
 
@@ -212,6 +250,20 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
         final classroomId = await _classroomService.createClassroom(classroom);
         
         if (classroomId != null) {
+          if (_useSampleContent && _selectedSampleContent != null) {
+            try {
+              final lessonId = _selectedSampleContent!['id'];
+              if (lessonId != null) {
+                await _classroomService.addLessonToClassroom(
+                  classroomId,
+                  lessonId,
+                );
+              }
+            } catch (e) {
+              print('Error adding sample content: $e');
+            }
+          }
+
           Get.back(result: true);
           Get.snackbar(
             'Thành công',
@@ -230,6 +282,16 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
     }
   }
 
+  // Thêm getter để kiểm tra điều kiện lưu
+  bool get _canSave {
+    final name = _nameController.text.trim();
+    final description = _descriptionController.text.trim();
+    return name.isNotEmpty && 
+           description.isNotEmpty && 
+           _selectedCourse != null && 
+           !_isCourseClosed;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -237,11 +299,12 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
         title: Text(_isEditMode ? 'Chỉnh sửa lớp học' : 'Tạo lớp học mới'),
         actions: [
           TextButton(
-            onPressed: _isLoading ? null : _save,
+            onPressed: _isLoading || !_canSave ? null : _save,
             child: Text(
-              'Lưu',
+              !_canSave ? 'Lưu' : 
+              _isCourseClosed ? 'Khóa học đã bị khóa' : 'Lưu',
               style: TextStyle(
-                color: _isLoading ? Colors.black.withOpacity(0.5) : Colors.black,
+                color: _isLoading || !_canSave ? Colors.black.withOpacity(0.5) : Colors.black,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -251,11 +314,11 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16.0),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_errorMessage != null)
                       Container(
@@ -315,46 +378,58 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<Course>(
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'Chọn khóa học',
-                      ),
                       value: _selectedCourse,
-                      items: [
-                        const DropdownMenuItem<Course>(
-                          value: null,
-                          child: Text('Không có khóa học'),
-                        ),
-                        ..._courses.map((course) {
-                          print('Adding course to dropdown: ${course.name} (${course.id})');
-                          return DropdownMenuItem<Course>(
-                            value: course,
-                            child: Text(course.name),
-                          );
-                        }).toList(),
-                      ],
-                      onChanged: (value) {
-                        print('Selected course: ${value?.name ?? 'null'} (${value?.id ?? 'null'})');
-                        setState(() {
-                          _selectedCourse = value;
-                        });
+                      decoration: const InputDecoration(
+                        labelText: 'Chọn khóa học',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _courses.map((course) {
+                        return DropdownMenuItem<Course>(
+                          value: course,
+                          child: Text(
+                            course.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: _onCourseSelected,
+                      validator: (value) {
+                        if (value == null) {
+                          return 'Vui lòng chọn khóa học';
+                        }
+                        return null;
                       },
+                      isExpanded: true,
                     ),
                     if (_selectedCourse != null) ...[
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: _isCourseClosed ? Colors.orange.shade50 : Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade100),
+                          border: Border.all(
+                            color: _isCourseClosed ? Colors.orange.shade100 : Colors.blue.shade100
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Thông tin khóa học: ${_selectedCourse!.name}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Thông tin khóa học: ${_selectedCourse!.name}',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                if (_isCourseClosed)
+                                  Icon(
+                                    Icons.lock,
+                                    color: Colors.orange.shade700,
+                                    size: 20,
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -374,12 +449,22 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
                             ),
                             if (_selectedCourse!.materialIds.isNotEmpty || 
                                 _selectedCourse!.templateFlashcardIds.isNotEmpty) ...[
-                              const SizedBox(height: 8),
                               Text(
                                 'Học liệu: ${_selectedCourse!.materialIds.length} bài học, ${_selectedCourse!.templateFlashcardIds.length} bộ flashcard',
                                 style: TextStyle(
                                   color: Colors.green.shade700,
                                   fontSize: 12,
+                                ),
+                              ),
+                            ],
+                            if (_isCourseClosed) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Khóa học này đã bị khóa và không thể tạo lớp học mới.',
+                                style: TextStyle(
+                                  color: Colors.orange.shade900,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
@@ -422,6 +507,41 @@ class _CreateEditClassroomScreenState extends State<CreateEditClassroomScreen> {
                         });
                       },
                     ),
+                    if (_selectedCourse != null && _sampleContents.isNotEmpty) ...[
+                      SwitchListTile(
+                        title: const Text('Sử dụng tài liệu mẫu'),
+                        value: _useSampleContent,
+                        onChanged: (value) {
+                          setState(() {
+                            _useSampleContent = value;
+                            if (!value) {
+                              _selectedSampleContent = null;
+                            }
+                          });
+                        },
+                      ),
+                      if (_useSampleContent) ...[
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<Map<String, dynamic>>(
+                          value: _selectedSampleContent,
+                          decoration: const InputDecoration(
+                            labelText: 'Chọn tài liệu mẫu',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _sampleContents.map((content) {
+                            return DropdownMenuItem<Map<String, dynamic>>(
+                              value: content,
+                              child: Text(content['title'] ?? 'Không có tiêu đề'),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedSampleContent = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ],
                   ],
                 ),
               ),

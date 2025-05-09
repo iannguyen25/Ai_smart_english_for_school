@@ -679,6 +679,7 @@ class ExerciseService {
       for (final question in exercise.questions) {
         print('Question ID: ${question.id}, content: ${question.content}');
         if (question.choices != null) {
+          print('Choices for question ${question.id}:');
           for (var i = 0; i < question.choices!.length; i++) {
             final choice = question.choices![i];
             print('  Choice ${i}: ${choice.id}, content: ${choice.content}, isCorrect: ${choice.isCorrect}');
@@ -697,12 +698,20 @@ class ExerciseService {
           if (question.type == QuestionType.multipleChoice) {
             // Kiểm tra xem câu trả lời có phải là đáp án đúng không
             if (question.choices != null && question.choices!.isNotEmpty) {
-              final correctChoice = question.choices!.firstWhere(
-                (c) => c.isCorrect, 
-                orElse: () => question.choices!.first
-              );
-              print('Correct choice: ${correctChoice.id}, user answer: $answer');
-              score = correctChoice.id == answer ? question.points : 0.0;
+              // Tìm đáp án đúng
+              final correctChoices = question.choices!.where((c) => c.isCorrect).toList();
+              
+              if (correctChoices.isEmpty) {
+                print('WARNING: No correct answer marked for question ${question.id}');
+                score = 0.0;
+              } else if (correctChoices.length > 1) {
+                print('WARNING: Multiple correct answers marked for question ${question.id}');
+                score = 0.0;
+              } else {
+                final correctChoice = correctChoices.first;
+                print('Correct choice: ${correctChoice.id}, user answer: $answer');
+                score = correctChoice.id == answer ? question.points : 0.0;
+              }
             }
           } else {
             // Sử dụng logic chấm điểm mặc định cho các loại câu hỏi khác
@@ -1033,6 +1042,24 @@ class ExerciseService {
     } catch (e) {
       print('Error updating question: $e');
       throw Exception('Không thể cập nhật câu hỏi: $e');
+    }
+  }
+
+  // Lấy tất cả attempts của một bài tập
+  Future<List<ExerciseAttempt>> getAttemptsByExercise(String exerciseId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('exercise_attempts')
+          .where('exerciseId', isEqualTo: exerciseId)
+          .orderBy('startTime', descending: true)
+          .get();
+          
+      return snapshot.docs
+          .map((doc) => ExerciseAttempt.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting attempts by exercise: $e');
+      return [];
     }
   }
 } 

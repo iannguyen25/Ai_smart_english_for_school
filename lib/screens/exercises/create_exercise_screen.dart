@@ -6,15 +6,19 @@ import 'package:firebase_auth/firebase_auth.dart' as auth;
 class CreateExerciseScreen extends StatefulWidget {
   final String? initialTitle;
   final String? initialDescription;
+  final String? initialTimeLimit;
   final String? lessonId;
   final String? classroomId;
+  final bool isSample;
 
   const CreateExerciseScreen({
     Key? key,
     this.initialTitle,
     this.initialDescription,
+    this.initialTimeLimit,
     this.lessonId,
     this.classroomId,
+    this.isSample = false,
   }) : super(key: key);
   @override
   _CreateExerciseScreenState createState() => _CreateExerciseScreenState();
@@ -24,7 +28,7 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _durationController = TextEditingController(text: '15'); // Default 15 minutes
+  final _timeLimitController = TextEditingController(text: '15'); // Default 15 minutes
   
   bool _isLoading = false;
   
@@ -49,7 +53,7 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _durationController.dispose();
+    _timeLimitController.dispose();
     super.dispose();
   }
 
@@ -139,36 +143,7 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
   }
 
   Future<void> _saveExercise() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    
-    // Validate questions
-    for (int i = 0; i < _questions.length; i++) {
-      final question = _questions[i];
-      final questionText = question['questionText'] as String;
-      final options = question['options'] as List<dynamic>;
-      
-      if (questionText.trim().isEmpty) {
-        Get.snackbar(
-          'Lỗi',
-          'Câu hỏi ${i + 1} không được để trống',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        return;
-      }
-      
-      for (int j = 0; j < options.length; j++) {
-        if (options[j].toString().trim().isEmpty) {
-          Get.snackbar(
-            'Lỗi',
-            'Lựa chọn ${j + 1} của câu hỏi ${i + 1} không được để trống',
-            snackPosition: SnackPosition.BOTTOM,
-          );
-          return;
-        }
-      }
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
@@ -178,7 +153,7 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
         throw 'Bạn chưa đăng nhập';
       }
       
-      final int duration = int.tryParse(_durationController.text) ?? 15;
+      final int timeLimit = int.tryParse(_timeLimitController.text.trim()) ?? 15;
 
       // Tạo bài tập mới
       final exerciseRef = await FirebaseFirestore.instance.collection('exercises').add({
@@ -188,7 +163,8 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
         'lessonId': widget.lessonId,
         'classroomId': widget.classroomId,
         'questionCount': _questions.length,
-        'duration': duration, // Duration in minutes
+        'timeLimit': timeLimit,
+        'isSample': widget.isSample,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -228,7 +204,7 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
         }
       }
 
-      Get.back();
+      Get.back(result: true);
       Get.snackbar(
         'Thành công',
         'Đã tạo bài tập mới',
@@ -307,7 +283,7 @@ class _CreateExerciseScreenState extends State<CreateExerciseScreen> {
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
-                              controller: _durationController,
+                              controller: _timeLimitController,
                               decoration: const InputDecoration(
                                 labelText: 'Thời gian làm bài (phút)',
                                 border: OutlineInputBorder(),

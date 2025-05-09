@@ -84,9 +84,16 @@ class _ClassroomListScreenState extends State<ClassroomListScreen>
           _teachingClassrooms = classrooms;
           _learningClassrooms = [];
         } else {
-          // Regular users see teaching and learning classrooms separately
-          _teachingClassrooms = classrooms.where((c) => c.teacherId == userId).toList();
-          _learningClassrooms = classrooms.where((c) => c.memberIds.contains(userId)).toList();
+          // Phân loại lớp học cho giáo viên
+          if (_authService.isCurrentUserTeacher) {
+            // Lấy tất cả lớp học mà giáo viên có liên quan
+            _teachingClassrooms = classrooms;
+            _learningClassrooms = [];
+          } else {
+            // Phân loại cho học viên
+            _teachingClassrooms = [];
+            _learningClassrooms = classrooms;
+          }
         }
         _isLoading = false;
       });

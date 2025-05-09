@@ -4,6 +4,12 @@ import '../models/lesson.dart';
 import '../models/learning_progress.dart';
 import '../models/app_user.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/flashcard_service.dart';
+import '../services/exercise_service.dart';
+import '../models/quiz.dart';
+import '../models/flashcard.dart';
+import '../models/flashcard_item.dart';
+import '../models/exercise.dart';
 
 class LessonService {
   // Singleton pattern
@@ -831,6 +837,7 @@ class LessonService {
     required List<LessonFolder> folders,
     int orderIndex = 0,
     int estimatedMinutes = 0,
+    bool isSample = false,
   }) async {
     try {
       final lesson = Lesson(
@@ -840,7 +847,7 @@ class LessonService {
         orderIndex: orderIndex,
         estimatedMinutes: estimatedMinutes,
         folders: folders,
-        approvalStatus: ApprovalStatus.pending,
+        approvalStatus: isSample ? ApprovalStatus.approved : ApprovalStatus.pending,
       );
 
       final docRef = await _lessonsCollection.add(lesson.toMap());
@@ -855,12 +862,13 @@ class LessonService {
   Future<void> addSampleLessons(String classroomId) async {
     try {
       // Bài học 1: Giới thiệu
-      await createLessonWithFolders(
+      final lesson1Id = await createLessonWithFolders(
         title: 'Bài 1: Giới thiệu',
         description: 'Bài học giới thiệu về khóa học',
         classroomId: classroomId,
         orderIndex: 0,
         estimatedMinutes: 30,
+        isSample: true,
         folders: [
           LessonFolder(
             title: 'Tài liệu học tập',
@@ -882,13 +890,27 @@ class LessonService {
         ],
       );
 
+      // Thêm video cho bài 1
+      if (lesson1Id != null) {
+        final video1 = VideoItem(
+          url: 'https://www.youtube.com/watch?v=V6D0R1Amq7w&t=1012s',
+          title: 'Video giới thiệu khóa học',
+          description: 'Video giới thiệu tổng quan về khóa học và cách học',
+        );
+
+        await _lessonsCollection.doc(lesson1Id).update({
+          'videoItems': FieldValue.arrayUnion([video1.toMap()]),
+        });
+      }
+
       // Bài học 2: Ngữ pháp cơ bản
-      await createLessonWithFolders(
+      final lesson2Id = await createLessonWithFolders(
         title: 'Bài 2: Ngữ pháp cơ bản',
         description: 'Các điểm ngữ pháp cơ bản',
         classroomId: classroomId,
         orderIndex: 1,
         estimatedMinutes: 45,
+        isSample: true,
         folders: [
           LessonFolder(
             title: 'Lý thuyết',
@@ -907,33 +929,78 @@ class LessonService {
               ),
             ],
           ),
-          LessonFolder(
-            title: 'Bài tập',
-            description: 'Phần bài tập thực hành',
-            orderIndex: 1,
-            items: [
-              LessonItem(
-                title: 'Bài tập thì hiện tại đơn',
-                type: LessonItemType.exercise,
-                content: 'Các bài tập về thì hiện tại đơn',
-              ),
-              LessonItem(
-                title: 'Bài tập thì hiện tại tiếp diễn',
-                type: LessonItemType.exercise,
-                content: 'Các bài tập về thì hiện tại tiếp diễn',
-              ),
-            ],
-          ),
         ],
       );
 
+      // Thêm video và flashcard cho bài 2
+      if (lesson2Id != null) {
+        // Thêm video
+        final video2 = VideoItem(
+          url: 'https://www.youtube.com/watch?v=V6D0R1Amq7w&t=1012s',
+          title: 'Bài giảng thì hiện tại đơn',
+          description: 'Video giảng dạy về thì hiện tại đơn',
+        );
+
+        await _lessonsCollection.doc(lesson2Id).update({
+          'videoItems': FieldValue.arrayUnion([video2.toMap()]),
+        });
+
+        // Thêm flashcard
+        final flashcardId = await _createSampleFlashcard(
+          lesson2Id,
+          classroomId,
+          'Flashcard thì hiện tại đơn',
+          'Các ví dụ về thì hiện tại đơn',
+          [
+            {'question': 'I ___ (go) to school every day', 'answer': 'go'},
+            {'question': 'She ___ (study) English twice a week', 'answer': 'studies'},
+            {'question': 'They ___ (play) football on Sunday', 'answer': 'play'},
+          ],
+        );
+
+        // Thêm exercise
+        final exerciseId = await _createSampleExercise(
+          lesson2Id,
+          classroomId,
+          'Bài tập thì hiện tại đơn',
+          'Các bài tập thực hành về thì hiện tại đơn',
+          [
+            Question(
+              id: '1',
+              content: 'He ___ (work) in a bank',
+              type: QuestionType.fillInBlank,
+              points: 1,
+              acceptableAnswers: ['works'],
+            ),
+            Question(
+              id: '2',
+              content: 'What is the correct form: "She ___ tennis every weekend"',
+              type: QuestionType.multipleChoice,
+              points: 1,
+              choices: [
+                Choice(id: '1', content: 'play', isCorrect: false),
+                Choice(id: '2', content: 'plays', isCorrect: true),
+                Choice(id: '3', content: 'playing', isCorrect: false),
+              ],
+            ),
+          ],
+        );
+
+        // Cập nhật lesson với flashcard và exercise IDs
+        await _lessonsCollection.doc(lesson2Id).update({
+          'flashcardIds': FieldValue.arrayUnion([flashcardId]),
+          'exerciseIds': FieldValue.arrayUnion([exerciseId]),
+        });
+      }
+
       // Bài học 3: Từ vựng chủ đề gia đình
-      await createLessonWithFolders(
+      final lesson3Id = await createLessonWithFolders(
         title: 'Bài 3: Từ vựng chủ đề gia đình',
         description: 'Học từ vựng về chủ đề gia đình',
         classroomId: classroomId,
         orderIndex: 2,
         estimatedMinutes: 40,
+        isSample: true,
         folders: [
           LessonFolder(
             title: 'Từ vựng',
@@ -945,35 +1012,166 @@ class LessonService {
                 type: LessonItemType.vocabulary,
                 content: 'Từ vựng về các thành viên trong gia đình',
               ),
-              LessonItem(
-                title: 'Mối quan hệ gia đình',
-                type: LessonItemType.vocabulary,
-                content: 'Từ vựng về các mối quan hệ trong gia đình',
-              ),
-            ],
-          ),
-          LessonFolder(
-            title: 'Bài tập',
-            description: 'Bài tập thực hành',
-            orderIndex: 1,
-            items: [
-              LessonItem(
-                title: 'Điền từ vào chỗ trống',
-                type: LessonItemType.exercise,
-                content: 'Bài tập điền từ vựng về gia đình',
-              ),
-              LessonItem(
-                title: 'Nối từ với hình ảnh',
-                type: LessonItemType.exercise,
-                content: 'Bài tập nối từ vựng với hình ảnh tương ứng',
-              ),
             ],
           ),
         ],
       );
+
+      // Thêm video và flashcard cho bài 3
+      if (lesson3Id != null) {
+        // Thêm video
+        final video3 = VideoItem(
+          url: 'https://www.youtube.com/watch?v=V6D0R1Amq7w&t=1012s',
+          title: 'Từ vựng về gia đình',
+          description: 'Video học từ vựng chủ đề gia đình',
+        );
+
+        await _lessonsCollection.doc(lesson3Id).update({
+          'videoItems': FieldValue.arrayUnion([video3.toMap()]),
+        });
+
+        // Thêm flashcard
+        final flashcardId = await _createSampleFlashcard(
+          lesson3Id,
+          classroomId,
+          'Flashcard từ vựng gia đình',
+          'Các từ vựng về gia đình',
+          [
+            {'question': 'father', 'answer': 'bố'},
+            {'question': 'mother', 'answer': 'mẹ'},
+            {'question': 'sister', 'answer': 'chị/em gái'},
+            {'question': 'brother', 'answer': 'anh/em trai'},
+          ],
+        );
+
+        // Thêm exercise
+        final exerciseId = await _createSampleExercise(
+          lesson3Id,
+          classroomId,
+          'Bài tập từ vựng gia đình',
+          'Các bài tập thực hành từ vựng về gia đình',
+          [
+            Question(
+              id: '1',
+              content: 'What is the meaning of "grandfather"?',
+              type: QuestionType.multipleChoice,
+              points: 1,
+              choices: [
+                Choice(id: '1', content: 'ông nội/ngoại', isCorrect: true),
+                Choice(id: '2', content: 'bà nội/ngoại', isCorrect: false),
+                Choice(id: '3', content: 'cô/dì', isCorrect: false),
+              ],
+            ),
+            Question(
+              id: '2',
+              content: 'Choose the correct translation for "aunt"',
+              type: QuestionType.multipleChoice,
+              points: 1,
+              choices: [
+                Choice(id: '1', content: 'chú/bác', isCorrect: false),
+                Choice(id: '2', content: 'cô/dì', isCorrect: true),
+                Choice(id: '3', content: 'anh/em trai', isCorrect: false),
+              ],
+            ),
+          ],
+        );
+
+        // Cập nhật lesson với flashcard và exercise IDs
+        await _lessonsCollection.doc(lesson3Id).update({
+          'flashcardIds': FieldValue.arrayUnion([flashcardId]),
+          'exerciseIds': FieldValue.arrayUnion([exerciseId]),
+        });
+      }
+
     } catch (e) {
       print('Error adding sample lessons: $e');
       throw Exception('Không thể thêm bài học mẫu: $e');
     }
+  }
+
+  // Helper function to create sample flashcards
+  Future<String> _createSampleFlashcard(String lessonId, String classroomId, String title, String description, List<Map<String, String>> items) async {
+    final flashcardService = FlashcardService();
+    final flashcard = await flashcardService.createFlashcard(
+      Flashcard(
+        title: title,
+        description: description,
+        userId: 'system',
+        lessonId: lessonId,
+        classroomId: classroomId,
+        isPublic: true,
+      ),
+    );
+
+    if (flashcard != null) {
+      // Add flashcard items
+      for (var item in items) {
+        await flashcardService.createFlashcardItem(
+          FlashcardItem(
+            flashcardId: flashcard,
+            question: item['question']!,
+            answer: item['answer']!,
+          ),
+        );
+      }
+      return flashcard;
+    }
+    throw Exception('Failed to create sample flashcard');
+  }
+
+  // Helper function to create sample exercise
+  Future<String> _createSampleExercise(String lessonId, String classroomId, String title, String description, List<Question> questions) async {
+    final exerciseService = ExerciseService();
+    
+    // Create the exercise first
+    final exercise = await exerciseService.createExercise(
+      title: title,
+      description: description,
+      lessonId: lessonId,
+      classroomId: classroomId,
+      questions: questions,
+      difficultyMatrix: const DifficultyMatrix(),
+      timeLimit: 300, // 5 minutes
+      attemptsAllowed: 3,
+      visibility: true,
+      createdBy: 'system',
+    );
+
+    if (exercise != null) {
+      // Save questions to exercise_questions collection
+      final batch = FirebaseFirestore.instance.batch();
+      
+      for (int i = 0; i < questions.length; i++) {
+        final question = questions[i];
+        final choices = question.choices ?? [];
+        final questionData = {
+          'exerciseId': exercise.id,
+          'questionText': question.content,
+          'options': choices.map((c) => c.content).toList(),
+          'correctOptionIndex': choices.indexWhere((c) => c.isCorrect),
+          'explanation': question.explanation,
+          'orderIndex': i,
+          'points': question.points,
+          'createdAt': Timestamp.now(),
+        };
+        
+        final questionRef = FirebaseFirestore.instance.collection('exercise_questions').doc();
+        batch.set(questionRef, questionData);
+      }
+      
+      await batch.commit();
+      return exercise.id!;
+    }
+    throw Exception('Failed to create sample exercise');
+  }
+
+  // Helper function to create sample video
+  Future<VideoItem> _createSampleVideo(String title, String description, String url) async {
+    return VideoItem(
+      url: url,
+      title: title,
+      description: description,
+      createdAt: Timestamp.now(),
+    );
   }
 } 

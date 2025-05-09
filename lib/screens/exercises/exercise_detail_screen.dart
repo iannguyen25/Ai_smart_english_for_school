@@ -16,6 +16,7 @@ import '../../services/flashcard_service.dart';
 import 'fill_in_the_blank_game.dart';
 import 'matching_game.dart';
 import '../../services/lesson_service.dart';
+import 'exercise_attempts_screen.dart';
 
 class ExerciseDetailScreen extends StatefulWidget {
   final String exerciseId;
@@ -442,6 +443,22 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
                   Navigator.push(
                     context,
                     MaterialPageRoute(
+                      builder: (context) => ExerciseAttemptsScreen(
+                        exerciseId: widget.exerciseId,
+                        lessonId: widget.lessonId,
+                        classroomId: widget.classroomId,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.list_alt),
+                tooltip: 'Xem danh sách bài làm',
+              ),
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
                       builder: (context) => EditExerciseScreen(
                         exercise: _exercise!,
                         onSaved: () {
@@ -470,7 +487,9 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> with Single
           children: [
             _buildStatusInfo(),
             Expanded(
-              child: _buildBody(),
+              // child: SingleChildScrollView(
+                child: _buildBody(),
+              // ),
             ),
           ],
         ),
